@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Projects — A+ Studio{% endblock %}
+{% block content %}
+<main class="dashboard-shell">
+  <section class="dashboard-head">
+    <div><div class="eyebrow dark">{{ organization.name }}</div><h1>Your app portfolio</h1><p>Build, preview, publish, and improve every app from one workspace.</p></div>
+    <div class="head-actions"><div class="credit-chip"><span>Feature credits</span><b>{{ organization.credits }}</b></div><a class="button" href="{% url 'project_create' %}">+ New app</a></div>
+  </section>
+  {% if projects %}
+  <section class="project-grid">
+    {% for project in projects %}
+    <a class="project-card" href="{% url 'project_detail' project.id %}">
+      <div class="project-card-top"><div class="app-avatar">{{ project.name|slice:':1'|upper }}</div><span class="status {{ project.status }}">{{ project.get_status_display }}</span></div>
+      <h2>{{ project.name }}</h2><p>{{ project.description|truncatechars:120 }}</p>
+      <div class="project-meta"><span>{{ project.business_type }}</span><span>v{{ project.version }}</span><span>{{ project.updated_at|timesince }} ago</span></div>
+      <div class="project-links"><span>Open builder</span><b>→</b></div>
+    </a>
+    {% endfor %}
+  </section>
+  {% else %}
+  <section class="empty-state"><div class="empty-icon">✦</div><h2>Your first app starts with one conversation.</h2><p>Describe your business and A+ Studio will provision the project, design the initial PWA, and give you a preview.</p><a class="button" href="{% url 'project_create' %}">Create your first app</a></section>
+  {% endif %}
+</main>
+{% endblock %}
