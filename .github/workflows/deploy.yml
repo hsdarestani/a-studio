@@ -1,0 +1,47 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: a-studio-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package release
+        run: tar --exclude=.git --exclude=.env -czf /tmp/a-studio-release.tar.gz .
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Upload release
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        run: |
+          sshpass -e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            /tmp/a-studio-release.tar.gz root@"$HOST":/tmp/a-studio-release.tar.gz
+      - name: Deploy and verify
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+          OPENAI_API_KEY: ${{ secrets.OPENAIAPIKEY }}
+        run: |
+          OPENAI_API_KEY_B64="$(printf '%s' "$OPENAI_API_KEY" | base64 -w0)"
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" < scripts/deploy.sh
+      - name: Public HTTPS health check
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS https://studio.aplus-solution.de/health/; then exit 0; fi
+            sleep 6
+          done
+          exit 1
