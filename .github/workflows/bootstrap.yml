@@ -1,0 +1,41 @@
+name: Bootstrap source tree
+
+on:
+  push:
+    branches:
+      - agent/build-a-plus-studio
+    paths:
+      - '.bootstrap/**'
+      - '.github/workflows/bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out build branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/build-a-plus-studio
+          fetch-depth: 0
+
+      - name: Expand source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/chunk-* | base64 --decode > /tmp/a-studio-source.tar.gz
+          tar -xzf /tmp/a-studio-source.tar.gz -C .
+          rm -rf .bootstrap .github/workflows/bootstrap.yml
+
+      - name: Commit source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "A+ Studio Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Build A+ Studio platform"
+          git push origin HEAD:agent/build-a-plus-studio
