@@ -3,6 +3,9 @@ name: Deploy production
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +17,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.event_name != 'pull_request' || github.event.pull_request.title == 'deploy: production'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -27,7 +31,7 @@ jobs:
           SSHPASS: ${{ secrets.PASS }}
           HOST: ${{ secrets.HOST }}
         run: |
-          sshpass -e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          sshpass -e scp -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             /tmp/a-studio-release.tar.gz root@"$HOST":/tmp/a-studio-release.tar.gz
       - name: Deploy and verify
         env:
@@ -36,7 +40,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAIAPIKEY }}
         run: |
           OPENAI_API_KEY_B64="$(printf '%s' "$OPENAI_API_KEY" | base64 -w0)"
-          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+          sshpass -e ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
             "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" < scripts/deploy.sh
       - name: Public HTTPS health check
         run: |
