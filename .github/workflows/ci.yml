@@ -30,3 +30,8 @@ jobs:
           python manage.py test
       - name: Compile Python
         run: python -m compileall -q .
+      - name: Validate production containers
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker build --tag a-studio:ci .
