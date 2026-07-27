@@ -25,16 +25,30 @@ jobs:
           ref: agent/full-code-agent-platform-v2
           fetch-depth: 0
 
+      - name: Record archive diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            wc -c .bootstrap-v2/chunk-*
+            sha256sum .bootstrap-v2/chunk-*
+          } > .bootstrap-v2-diagnostics.txt
+          git config user.name "A+ Studio Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add .bootstrap-v2-diagnostics.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Record v2 archive diagnostics"
+            git push origin HEAD:agent/full-code-agent-platform-v2
+          fi
+
       - name: Verify and expand source release
         shell: bash
         run: |
           set -euo pipefail
-          wc -c .bootstrap-v2/chunk-*
-          sha256sum .bootstrap-v2/chunk-*
           cat .bootstrap-v2/chunk-* | base64 --decode > /tmp/a-studio-v2.tar.gz
           gzip -t /tmp/a-studio-v2.tar.gz
           tar -xzf /tmp/a-studio-v2.tar.gz -C .
-          rm -rf .bootstrap-v2
+          rm -rf .bootstrap-v2 .bootstrap-v2-diagnostics.txt
 
       - name: Commit source tree
         shell: bash
