@@ -1,0 +1,42 @@
+{
+  email admin@aplus-solution.de
+  on_demand_tls {
+    ask http://web:8000/api/tls/allow/
+  }
+}
+
+studio.aplus-solution.de {
+  encode zstd gzip
+
+  handle_path /apps/* {
+    root * /srv/apps/live
+    try_files {path} {path}/ /index.html
+    file_server
+  }
+
+  handle_path /preview/* {
+    root * /srv/apps/preview
+    try_files {path} {path}/ /index.html
+    file_server
+  }
+
+  handle_path /static/* {
+    root * /srv/static
+    file_server
+  }
+
+  reverse_proxy web:8000
+}
+
+https:// {
+  tls {
+    on_demand
+  }
+  @customer host_regexp customer ^(?P<slug>[a-z0-9][a-z0-9-]{1,61}[a-z0-9])\.studio\.aplus-solution\.de$
+  handle @customer {
+    root * /srv/apps/live/{re.customer.slug}
+    try_files {path} {path}/ /index.html
+    file_server
+  }
+  respond "Unknown app" 404
+}

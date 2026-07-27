@@ -1,0 +1,28 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101114">
+  <title>{% block title %}A+ Studio{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'app.css' %}">
+  <script defer src="{% static 'app.js' %}"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% if user.is_authenticated %}
+  <header class="site-header">
+    <a class="logo" href="{% url 'dashboard' %}"><span>A+</span> Studio</a>
+    <nav class="header-nav">
+      <a href="{% url 'dashboard' %}">Projects</a>
+      <a href="{% url 'billing' %}">Billing</a>
+      <form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="link-button">Log out</button></form>
+    </nav>
+  </header>
+  {% endif %}
+  {% if messages %}
+    <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}A+ Studio — Build your app by chatting{% endblock %}
+{% block body_class %}landing-body{% endblock %}
+{% block content %}
+<header class="landing-nav">
+  <a class="logo light" href="/"><span>A+</span> Studio</a>
+  <div><a class="text-link" href="{% url 'login' %}">Log in</a><a class="button small" href="{% url 'signup' %}">Start building</a></div>
+</header>
+<main class="landing-main">
+  <section class="landing-hero">
+    <div class="eyebrow">AI SOFTWARE FACTORY FOR REAL BUSINESSES</div>
+    <h1>Describe the app.<br><em>We build it.</em></h1>
+    <p>Create a production-ready PWA through conversation. Every project gets its own workspace, preview, source repository, version history, deployment pipeline, and optional App Store publishing.</p>
+    <div class="hero-actions"><a class="button" href="{% url 'signup' %}">Build your first app</a><a class="ghost-button" href="#how">See how it works</a></div>
+    <div class="hero-proof"><span>✓ PWA-first</span><span>✓ EU-ready infrastructure</span><span>✓ Human support</span><span>✓ Store publishing add-on</span></div>
+  </section>
+  <section class="visual-stage">
+    <div class="studio-window">
+      <div class="window-bar"><i></i><i></i><i></i><span>studio.aplus-solution.de</span></div>
+      <div class="window-grid">
+        <aside><div class="mini-logo">A+</div><b>Luna Beauty</b><small>Version 1.4</small><nav><span class="active">AI Builder</span><span>App preview</span><span>Deployments</span><span>Settings</span></nav></aside>
+        <div class="mock-chat"><div class="bubble user">Add online booking and show discounted services first.</div><div class="bubble ai"><b>A+ Builder</b><br>I added a mobile booking flow, service filters, and priority sorting for offers. Your safe preview is ready.</div><div class="mock-status"><span>Preview build passed</span><b>Open preview →</b></div></div>
+        <div class="phone"><div class="phone-screen"><div class="phone-top">Luna</div><div class="phone-hero"><small>BEAUTY, YOUR WAY</small><strong>Feel like<br>your best self.</strong><button>Book now</button></div><div class="phone-cards"><i></i><i></i></div></div></div>
+      </div>
+    </div>
+  </section>
+  <section id="how" class="landing-section">
+    <div class="section-heading"><span>THE COMPLETE LOOP</span><h2>From idea to a living product.</h2></div>
+    <div class="steps-grid">
+      <article><b>01</b><h3>Consult</h3><p>AI and A+ experts clarify what your business actually needs before development starts.</p></article>
+      <article><b>02</b><h3>Build</h3><p>Chat with the builder. Every approved change becomes a versioned, testable app update.</p></article>
+      <article><b>03</b><h3>Preview</h3><p>Nothing touches production first. Review a protected preview and request refinements.</p></article>
+      <article><b>04</b><h3>Publish</h3><p>Launch as a PWA immediately, or let A+ prepare and submit native store packages.</p></article>
+    </div>
+  </section>
+  <section class="landing-section dark-panel">
+    <div><span class="eyebrow">NOT ANOTHER TEMPLATE BUILDER</span><h2>Your app keeps evolving after launch.</h2></div>
+    <div class="feature-list"><span>Private project source</span><span>AI-guided product decisions</span><span>Feature-based pricing</span><span>Managed hosting & backups</span><span>Version history & rollback</span><span>Store submission service</span></div>
+  </section>
+</main>
+<footer class="landing-footer"><span>© 2026 A+ Solution GmbH</span><span>Built in Germany for ambitious businesses.</span></footer>
+{% endblock %}

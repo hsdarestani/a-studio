@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Billing — A+ Studio{% endblock %}
+{% block content %}
+<main class="dashboard-shell">
+  <section class="dashboard-head"><div><div class="eyebrow dark">PLANS & FEATURE CREDITS</div><h1>Scale the way you build.</h1><p>Hosting, safe deployments, AI changes, and ongoing support are combined in one workspace.</p></div><div class="credit-chip"><span>Current credits</span><b>{{ organization.credits }}</b></div></section>
+  <section class="pricing-grid">
+    {% for key, plan in plans.items %}
+    <article class="pricing-card {% if organization.plan == key %}featured{% endif %}">
+      <div><span class="pill">{% if organization.plan == key %}Current plan{% else %}{{ plan.projects }} project{{ plan.projects|pluralize }}{% endif %}</span><h2>{{ plan.name }}</h2><div class="price-line"><b>€{{ plan.monthly }}</b><span>/month</span></div><p>{{ plan.credits }} new feature credits each month, managed hosting, SSL, backups, version history, and preview deployments.</p></div>
+      <form method="post" action="{% url 'billing_checkout' key %}">{% csrf_token %}<button class="button full" {% if organization.plan == key %}disabled{% endif %}>{% if organization.plan == key %}Active{% else %}Choose {{ plan.name }}{% endif %}</button></form>
+    </article>
+    {% endfor %}
+  </section>
+  <section class="billing-note"><h2>Store publishing is separate.</h2><p>A+ reviews store eligibility, prepares native packages, metadata, screenshots, privacy declarations, testing tracks, and submission under the customer's own developer accounts.</p></section>
+</main>
+{% endblock %}

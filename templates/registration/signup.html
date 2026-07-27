@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Create account — A+ Studio{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block content %}
+<div class="auth-shell wide-auth">
+  <a class="logo light" href="/"><span>A+</span> Studio</a>
+  <div class="auth-card">
+    <div class="eyebrow dark">START WITH 20 CREDITS</div><h1>Build your first PWA.</h1><p>Tell the AI what your business needs. Your first preview is created automatically.</p>
+    <form method="post" class="form-stack">{% csrf_token %}{{ form.as_p }}<button class="button full">Create workspace</button></form>
+    <div class="auth-footer">Already registered? <a href="{% url 'login' %}">Log in</a></div>
+  </div>
+</div>
+{% endblock %}

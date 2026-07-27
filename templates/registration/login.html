@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Log in — A+ Studio{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  <a class="logo light" href="/"><span>A+</span> Studio</a>
+  <div class="auth-card">
+    <div class="eyebrow dark">WELCOME BACK</div><h1>Continue building.</h1><p>Open your projects, review previews, and ship the next version.</p>
+    <form method="post" class="form-stack">{% csrf_token %}{{ form.as_p }}<button class="button full">Log in</button></form>
+    <div class="auth-footer">New to A+ Studio? <a href="{% url 'signup' %}">Create an account</a></div>
+  </div>
+</div>
+{% endblock %}
