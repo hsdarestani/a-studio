@@ -1,0 +1,39 @@
+name: Bootstrap A+ Studio v2 source
+
+on:
+  push:
+    branches:
+      - agent/full-code-agent-platform-v2
+    paths:
+      - '.github/workflows/bootstrap-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out v2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/full-code-agent-platform-v2
+          fetch-depth: 0
+
+      - name: Expand source release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap-v2/chunk-* | base64 --decode > /tmp/a-studio-v2.tar.gz
+          tar -xzf /tmp/a-studio-v2.tar.gz -C .
+          rm -rf .bootstrap-v2
+
+      - name: Commit source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "A+ Studio Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Add full AI code-agent platform"
+          git push origin HEAD:agent/full-code-agent-platform-v2
