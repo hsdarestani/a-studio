@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  pull_request_target:
-    branches: [main]
-    types: [synchronize]
 
 concurrency:
   group: a-studio-production
@@ -17,7 +14,6 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event_name != 'pull_request_target' || (github.event.pull_request.title == 'deploy: production' && github.actor == 'hsdarestani')
     runs-on: ubuntu-latest
     environment: production
     steps:
