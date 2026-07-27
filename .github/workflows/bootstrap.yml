@@ -33,7 +33,8 @@ jobs:
           set -euo pipefail
           cat .bootstrap/chunk-00 .bootstrap/chunk-01 .bootstrap/chunk-02 .bootstrap/chunk-03 .bootstrap/chunk-04 .bootstrap/chunk-05 .bootstrap/chunk-06-* | base64 --decode > /tmp/a-studio-source.tar.gz
           tar -xzf /tmp/a-studio-source.tar.gz -C .
-          rm -rf .bootstrap .github/workflows/bootstrap.yml
+          rm -rf .bootstrap
+          rm -f .github/workflows/ci.yml .github/workflows/deploy.yml
 
       - name: Commit source tree
         shell: bash
