@@ -6,12 +6,17 @@ on:
       - agent/full-code-agent-platform-v2
     paths:
       - '.github/workflows/bootstrap-v2.yml'
+  pull_request:
+    branches:
+      - main
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   bootstrap:
+    if: github.event_name != 'pull_request' || github.head_ref == 'agent/full-code-agent-platform-v2'
     runs-on: ubuntu-latest
     steps:
       - name: Check out v2 branch
