@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  issues:
+    types: [opened]
 
 concurrency:
   group: a-studio-production
@@ -14,6 +16,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.event_name != 'issues' || github.event.issue.title == 'deploy: production'
     runs-on: ubuntu-latest
     environment: production
     steps:
