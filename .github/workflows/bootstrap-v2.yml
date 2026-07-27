@@ -9,7 +9,7 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened]
+    types: [opened, synchronize]
 
 permissions:
   contents: write
@@ -25,11 +25,14 @@ jobs:
           ref: agent/full-code-agent-platform-v2
           fetch-depth: 0
 
-      - name: Expand source release
+      - name: Verify and expand source release
         shell: bash
         run: |
           set -euo pipefail
+          wc -c .bootstrap-v2/chunk-*
+          sha256sum .bootstrap-v2/chunk-*
           cat .bootstrap-v2/chunk-* | base64 --decode > /tmp/a-studio-v2.tar.gz
+          gzip -t /tmp/a-studio-v2.tar.gz
           tar -xzf /tmp/a-studio-v2.tar.gz -C .
           rm -rf .bootstrap-v2
 
