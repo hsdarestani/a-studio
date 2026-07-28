@@ -90,6 +90,38 @@ def sanitize_spec(spec):
     return result
 
 
+def _model_candidates():
+    configured = [settings.OPENAI_MODEL, *getattr(settings, "OPENAI_FALLBACK_MODELS", [])]
+    candidates = []
+    for model in configured:
+        model = str(model or "").strip()
+        if model and model not in candidates:
+            candidates.append(model)
+    return candidates
+
+
+def _is_model_access_error(exc):
+    message = str(exc).lower()
+    status_code = getattr(exc, "status_code", None)
+    return status_code == 404 or "model_not_found" in message or "must be verified" in message or "does not have access" in message
+
+
+def _create_response(client, context):
+    candidates = _model_candidates()
+    if not candidates:
+        raise RuntimeError("No OpenAI model is configured")
+    for index, model in enumerate(candidates):
+        try:
+            return client.responses.create(
+                model=model,
+                instructions=SYSTEM_PROMPT,
+                input=json.dumps(context, ensure_ascii=False),
+            )
+        except Exception as exc:
+            if index == len(candidates) - 1 or not _is_model_access_error(exc):
+                raise
+
+
 def propose_change(project, user_message, history):
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not configured")
@@ -101,11 +133,7 @@ def propose_change(project, user_message, history):
         "recent_messages": history[-10:],
         "request": user_message,
     }
-    response = client.responses.create(
-        model=settings.OPENAI_MODEL,
-        instructions=SYSTEM_PROMPT,
-        input=json.dumps(context, ensure_ascii=False),
-    )
+    response = _create_response(client, context)
     payload = _extract_json(response.output_text)
     action = payload.get("action", "clarify")
     if action not in {"clarify", "apply"}:
