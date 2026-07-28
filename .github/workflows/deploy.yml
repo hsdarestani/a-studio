@@ -54,9 +54,39 @@ jobs:
           tail -n 260 /tmp/a-studio-remote-deploy.log
           exit "$status"
       - name: Public HTTPS health check
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS https://studio.aplus-solution.de/health/; then exit 0; fi
+          set +e
+          echo "--- Runner DNS ---"
+          getent ahostsv4 studio.aplus-solution.de || true
+          getent ahostsv6 studio.aplus-solution.de || true
+          echo "--- Runner HTTPS attempts ---"
+          for i in $(seq 1 20); do
+            if curl -4 -fsS --connect-timeout 10 https://studio.aplus-solution.de/health/; then
+              exit 0
+            fi
             sleep 6
           done
+          echo "--- Runner verbose HTTPS ---"
+          curl -4 -vk --connect-timeout 15 --max-time 30 https://studio.aplus-solution.de/health/ || true
+          echo "--- Remote public-edge diagnostics ---"
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" 'bash -s' <<'REMOTE'
+          set +e
+          echo "DNS from server:"
+          getent ahostsv4 studio.aplus-solution.de || true
+          getent ahostsv6 studio.aplus-solution.de || true
+          echo "Listening ports:"
+          ss -ltnp | grep -E ':(22|80|443|8000)\b' || true
+          cd /opt/a-studio/current || exit 0
+          echo "Compose status:"
+          docker compose ps -a || true
+          echo "Caddy logs:"
+          docker compose logs --no-color --tail=180 caddy || true
+          echo "HTTP through local Caddy:"
+          curl -v --connect-timeout 10 -H 'Host: studio.aplus-solution.de' http://127.0.0.1/health/ || true
+          echo "HTTPS through local Caddy:"
+          curl -vk --connect-timeout 15 --resolve studio.aplus-solution.de:443:127.0.0.1 https://studio.aplus-solution.de/health/ || true
+          REMOTE
           exit 1
