@@ -17,6 +17,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          token: ${{ secrets.GITHUBTOKEN }}
       - name: Expand verified patch
         shell: bash
         run: |
@@ -39,6 +40,5 @@ jobs:
           git config user.name 'A+ Studio Automation'
           git config user.email 'app@aplus-solution.de'
           git add -A
-          git status --short
           git commit -m 'Redesign A+ Studio in German with social login'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
