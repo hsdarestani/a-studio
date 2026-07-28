@@ -22,92 +22,87 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
 
           views = Path('core/views.py')
           text = views.read_text()
-          text = text.replace(
-              'from django.contrib.auth.decorators import login_required\n',
-              'from django.contrib.auth.decorators import login_required\nfrom django.db import transaction\n',
-              1,
-          )
-          old = '''    if request.method == "POST" and form.is_valid():
-              user = form.save()
-              organization = Organization.objects.create(
-                  name=form.cleaned_data["company_name"],
-                  owner=user,
-                  billing_email=user.email,
-                  credits=20,
+          if 'from django.db import transaction\n' not in text:
+              text = text.replace(
+                  'from django.contrib.auth.decorators import login_required\n',
+                  'from django.contrib.auth.decorators import login_required\nfrom django.db import transaction\n',
+                  1,
               )
-              Membership.objects.create(organization=organization, user=user, role="owner")
-              CreditTransaction.objects.create(
-                  organization=organization,
-                  kind="grant",
-                  amount=20,
-                  balance_after=20,
-                  description=_("Welcome credits"),
-              )
-              login(request, user)
-              return redirect("project_create")
-          '''
-          new = '''    if request.method == "POST" and form.is_valid():
-              with transaction.atomic():
-                  user = form.save()
-                  organization = Organization.objects.create(
-                      name=form.cleaned_data["company_name"],
-                      owner=user,
-                      billing_email=user.email,
-                      credits=20,
-                  )
-                  Membership.objects.create(organization=organization, user=user, role="owner")
-                  CreditTransaction.objects.create(
-                      organization=organization,
-                      kind="grant",
-                      amount=20,
-                      balance_after=20,
-                      description=_("Welcome credits"),
-                  )
-                  login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-              return redirect("project_create")
-          '''
-          if old not in text:
-              raise SystemExit('Expected signup block not found')
-          views.write_text(text.replace(old, new, 1))
+
+          function_start = text.index('def signup(request):')
+          block_start = text.index('    if request.method == "POST" and form.is_valid():', function_start)
+          block_end = text.index('    return render(request, "registration/signup.html", {"form": form})', block_start)
+          new_block = dedent('''
+              if request.method == "POST" and form.is_valid():
+                  with transaction.atomic():
+                      user = form.save()
+                      organization = Organization.objects.create(
+                          name=form.cleaned_data["company_name"],
+                          owner=user,
+                          billing_email=user.email,
+                          credits=20,
+                      )
+                      Membership.objects.create(organization=organization, user=user, role="owner")
+                      CreditTransaction.objects.create(
+                          organization=organization,
+                          kind="grant",
+                          amount=20,
+                          balance_after=20,
+                          description=_("Welcome credits"),
+                      )
+                      login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+                  return redirect("project_create")
+          ''')
+          text = text[:block_start] + new_block + text[block_end:]
+          views.write_text(text)
 
           tests = Path('core/tests.py')
           text = tests.read_text()
-          text = text.replace(
-              'from django.test import TestCase, override_settings\n',
-              'from django.test import TestCase, override_settings\nfrom django.urls import reverse\n',
-              1,
-          )
-          addition = '''
+          if 'from django.urls import reverse\n' not in text:
+              text = text.replace(
+                  'from django.test import TestCase, override_settings\n',
+                  'from django.test import TestCase, override_settings\nfrom django.urls import reverse\n',
+                  1,
+              )
+          addition = dedent('''
 
-          class SignupTests(TestCase):
-              def test_email_signup_logs_in_with_multiple_auth_backends(self):
-                  response = self.client.post(
-                      reverse("signup"),
-                      {
-                          "full_name": "Max Mustermann",
-                          "email": "max@example.com",
-                          "company_name": "Muster GmbH",
-                          "password1": "A-very-safe-password-2026!",
-                          "password2": "A-very-safe-password-2026!",
-                      },
-                  )
+              class SignupTests(TestCase):
+                  def test_email_signup_logs_in_with_multiple_auth_backends(self):
+                      response = self.client.post(
+                          reverse("signup"),
+                          {
+                              "full_name": "Max Mustermann",
+                              "email": "max@example.com",
+                              "company_name": "Muster GmbH",
+                              "password1": "A-very-safe-password-2026!",
+                              "password2": "A-very-safe-password-2026!",
+                          },
+                      )
 
-                  self.assertRedirects(response, reverse("project_create"), fetch_redirect_response=False)
-                  user = User.objects.get(email="max@example.com")
-                  self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
-                  self.assertEqual(
-                      self.client.session["_auth_user_backend"],
-                      "django.contrib.auth.backends.ModelBackend",
-                  )
-                  organization = Organization.objects.get(owner=user)
-                  self.assertEqual(organization.credits, 20)
-                  self.assertTrue(Membership.objects.filter(organization=organization, user=user, role="owner").exists())
-          '''
+                      self.assertRedirects(response, reverse("project_create"), fetch_redirect_response=False)
+                      user = User.objects.get(email="max@example.com")
+                      self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
+                      self.assertEqual(
+                          self.client.session["_auth_user_backend"],
+                          "django.contrib.auth.backends.ModelBackend",
+                      )
+                      organization = Organization.objects.get(owner=user)
+                      self.assertEqual(organization.credits, 20)
+                      self.assertTrue(
+                          Membership.objects.filter(
+                              organization=organization,
+                              user=user,
+                              role="owner",
+                          ).exists()
+                      )
+          ''')
           if 'class SignupTests(TestCase):' not in text:
-              tests.write_text(text + addition)
+              text += addition
+          tests.write_text(text)
           PY
           rm -f .github/workflows/apply-signup-fix.yml
           git config user.name 'A+ Studio Automation'
