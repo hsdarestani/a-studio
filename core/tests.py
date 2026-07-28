@@ -1,11 +1,12 @@
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from .models import Conversation, Membership, Organization, Project
-from .services.ai import initial_spec, sanitize_spec
+from .services.ai import initial_spec, propose_change, sanitize_spec
 from .services.generator import generate_preview, publish_project
 from .services.pricing import cost_for_size, estimate_size
 
@@ -47,6 +48,27 @@ class GeneratorTests(TestCase):
             root, _ = generate_preview(self.project)
             data = json.loads((root / "manifest.webmanifest").read_text())
             self.assertEqual(data["display"], "standalone")
+
+    @override_settings(OPENAI_MODEL="blocked-model", OPENAI_FALLBACK_MODELS=["working-model"])
+    @patch("core.services.ai.OpenAI")
+    def test_model_access_error_uses_configured_fallback(self, openai_class):
+        response = Mock(output_text=json.dumps({
+            "action": "apply",
+            "message": "Updated safely.",
+            "feature_title": "Fallback update",
+            "feature_description": "Uses an accessible model.",
+            "spec": self.project.app_spec,
+        }))
+        client = Mock()
+        client.responses.create.side_effect = [Exception("model_not_found: organization must be verified"), response]
+        openai_class.return_value = client
+
+        result = propose_change(self.project, "Update the app", [])
+
+        self.assertEqual(result["action"], "apply")
+        self.assertEqual(client.responses.create.call_count, 2)
+        self.assertEqual(client.responses.create.call_args_list[0].kwargs["model"], "blocked-model")
+        self.assertEqual(client.responses.create.call_args_list[1].kwargs["model"], "working-model")
 
 
 class PricingTests(TestCase):
