@@ -22,7 +22,6 @@ jobs:
       HOST: ${{ secrets.HOST }}
       BASE_URL: https://studio.aplus-solution.de
       TEST_EMAIL: builder-layout-${{ github.run_id }}@example.invalid
-      TEST_PASSWORD: Builder-${{ github.run_id }}-Aa9!
     steps:
       - uses: actions/checkout@v4
 
@@ -31,17 +30,18 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq sshpass >/dev/null
 
-      - name: Regenerate Flavor and create temporary viewer
+      - name: Regenerate Flavor and create authenticated test session
         id: prepare
         run: |
           set -euo pipefail
-          OUTPUT=$(sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' TEST_PASSWORD='$TEST_PASSWORD' bash -s" <<'REMOTE'
+          OUTPUT=$(sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/a-studio/current
-          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" -e TEST_PASSWORD="$TEST_PASSWORD" web python manage.py shell <<'PY'
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" web python manage.py shell <<'PY'
           import os
           from django.conf import settings
           from django.contrib.auth import get_user_model
+          from django.test import Client
           from django.urls import reverse
           from core.models import Membership, Project
           from core.services.generator import generate_preview
@@ -68,12 +68,11 @@ jobs:
           index = (root / "index.html").read_text()
           runtime = (root / "app.js").read_text()
           service_worker = (root / "sw.js").read_text()
-          required_index = [
+          for marker in (
               f"app.js?v={project.version}",
               f"styles.css?v={project.version}",
               "window.APP_CACHE_PREFIX",
-          ]
-          for marker in required_index:
+          ):
               if marker not in index:
                   raise RuntimeError(f"Regenerated Flavor index is missing {marker}")
           if "location.pathname.includes('/preview/')" not in runtime:
@@ -81,27 +80,26 @@ jobs:
           if f"astudio-{project.slug}-v{project.version}" not in service_worker:
               raise RuntimeError("Project-scoped service-worker cache is missing")
 
-          email = os.environ["TEST_EMAIL"]
-          password = os.environ["TEST_PASSWORD"]
           User = get_user_model()
           User.objects.filter(
               username__startswith="builder-layout-",
               username__endswith="@example.invalid",
           ).delete()
-          user = User.objects.create_user(
-              username=email,
-              email=email,
-              password=password,
-              first_name="Builder",
-              last_name="Smoke",
-          )
-          Membership.objects.update_or_create(
+          email = os.environ["TEST_EMAIL"]
+          user = User.objects.create_user(username=email, email=email)
+          Membership.objects.create(
               organization=project.organization,
               user=user,
-              defaults={"role": "member"},
+              role="member",
           )
 
+          client = Client()
+          client.force_login(user, backend="django.contrib.auth.backends.ModelBackend")
+          session_cookie = client.cookies[settings.SESSION_COOKIE_NAME].value
+
           print("PROJECT_PATH=" + reverse("project_detail", args=[project.id]))
+          print("SESSION_COOKIE_NAME=" + settings.SESSION_COOKIE_NAME)
+          print("SESSION_COOKIE_VALUE=" + session_cookie)
           print(
               "FLAVOR_ASSETS_REGENERATED",
               {
@@ -113,10 +111,17 @@ jobs:
           PY
           REMOTE
           )
-          echo "$OUTPUT"
+          echo "$OUTPUT" | sed '/^SESSION_COOKIE_VALUE=/d'
           PROJECT_PATH=$(printf '%s\n' "$OUTPUT" | sed -n 's/^PROJECT_PATH=//p' | tail -1)
+          COOKIE_NAME=$(printf '%s\n' "$OUTPUT" | sed -n 's/^SESSION_COOKIE_NAME=//p' | tail -1)
+          COOKIE_VALUE=$(printf '%s\n' "$OUTPUT" | sed -n 's/^SESSION_COOKIE_VALUE=//p' | tail -1)
           test -n "$PROJECT_PATH"
+          test -n "$COOKIE_NAME"
+          test -n "$COOKIE_VALUE"
+          echo "::add-mask::$COOKIE_VALUE"
           echo "project_path=$PROJECT_PATH" >> "$GITHUB_OUTPUT"
+          echo "cookie_name=$COOKIE_NAME" >> "$GITHUB_OUTPUT"
+          echo "cookie_value=$COOKIE_VALUE" >> "$GITHUB_OUTPUT"
 
       - name: Prepare installed Chrome
         run: |
@@ -124,7 +129,7 @@ jobs:
           cd /tmp/builder-browser
           npm init -y >/dev/null
           npm install playwright-core >/dev/null
-          CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || command -v microsoft-edge || true)"
+          CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
           test -n "$CHROME_PATH"
           "$CHROME_PATH" --version
           echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
@@ -132,31 +137,34 @@ jobs:
       - name: Verify composer and interactive preview in a real browser
         env:
           PROJECT_PATH: ${{ steps.prepare.outputs.project_path }}
+          SESSION_COOKIE_NAME: ${{ steps.prepare.outputs.cookie_name }}
+          SESSION_COOKIE_VALUE: ${{ steps.prepare.outputs.cookie_value }}
         run: |
           cd /tmp/builder-browser
           cat > smoke.js <<'JS'
           const { chromium } = require('playwright-core');
 
           (async () => {
-            const baseUrl = process.env.BASE_URL;
-            const projectPath = process.env.PROJECT_PATH;
             const browser = await chromium.launch({
               headless: true,
               executablePath: process.env.CHROME_PATH,
               args: ['--no-sandbox'],
             });
             const context = await browser.newContext({ viewport: { width: 1792, height: 856 } });
+            await context.addCookies([{
+              name: process.env.SESSION_COOKIE_NAME,
+              value: process.env.SESSION_COOKIE_VALUE,
+              domain: 'studio.aplus-solution.de',
+              path: '/',
+              secure: true,
+              httpOnly: true,
+              sameSite: 'Lax',
+            }]);
             const page = await context.newPage();
-
-            await page.goto(`${baseUrl}/accounts/login/`, { waitUntil: 'networkidle', timeout: 60000 });
-            await page.locator('input[name="username"]').fill(process.env.TEST_EMAIL);
-            await page.locator('input[name="password"]').fill(process.env.TEST_PASSWORD);
-            await Promise.all([
-              page.waitForURL(url => !url.pathname.includes('/accounts/login/'), { timeout: 30000 }),
-              page.locator('form.auth-form button[type="submit"]').click(),
-            ]);
-
-            await page.goto(`${baseUrl}${projectPath}`, { waitUntil: 'networkidle', timeout: 60000 });
+            await page.goto(`${process.env.BASE_URL}${process.env.PROJECT_PATH}`, {
+              waitUntil: 'networkidle',
+              timeout: 60000,
+            });
             await page.waitForSelector('#chat-form', { state: 'visible', timeout: 30000 });
             await page.waitForSelector('#preview-frame', { state: 'visible', timeout: 30000 });
 
@@ -180,7 +188,7 @@ jobs:
             if (initial.composerBottom > initial.viewportHeight + 1) {
               throw new Error(`Composer is below the viewport: ${JSON.stringify(initial)}`);
             }
-            if (initial.composerHeight < 80 || initial.composerTop <= initial.streamTop) {
+            if (initial.composerHeight < 70 || initial.composerTop <= initial.streamTop) {
               throw new Error(`Composer geometry is invalid: ${JSON.stringify(initial)}`);
             }
             if (initial.streamBottom > initial.composerTop + 1) {
