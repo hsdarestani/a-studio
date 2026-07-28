@@ -1,0 +1,475 @@
+name: Rebuild Flavor interactive experience
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    if: github.head_ref == 'agent/rebuild-flavor-interactive' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH helper
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Rebuild and verify Flavor in production
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        run: |
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T web python manage.py shell <<'PY'
+          import base64
+          import json
+          import shutil
+          import tempfile
+          from pathlib import Path
+
+          import requests
+          from django.conf import settings
+
+          from core.models import Deployment, Message, Project
+          from core.services.ai import sanitize_spec
+          from core.services.generator import generate_preview
+          from core.services.github import sync_project_repository
+
+
+          spec = {
+              "app": {
+                  "title": "Flavor",
+                  "tagline": "Find the perfume that feels like you.",
+                  "language": "en",
+                  "direction": "ltr",
+              },
+              "brand": {
+                  "primary": "#6C4DFF",
+                  "accent": "#20C7D9",
+                  "background": "#F5F2FF",
+                  "surface": "#FFFFFF",
+                  "text": "#16131F",
+              },
+              "features": ["recommendation", "gamification", "profile", "favorites"],
+              "navigation": ["home", "quiz", "results", "profile", "favorites"],
+              "sections": [
+                  {
+                      "type": "hero",
+                      "title": "Your identity. Your signature scent.",
+                      "text": "Answer six playful questions and unlock fragrance matches shaped around your energy, style and favorite atmosphere.",
+                      "button": "Discover my scent",
+                  },
+                  {
+                      "type": "recommendation_quiz",
+                      "title": "Scent Identity Quest",
+                      "intro": "Build your fragrance profile, earn XP and discover the scents that match your personality.",
+                      "start_label": "Start the quest",
+                      "result_title": "Your signature scent matches",
+                      "result_intro": "We compared your scent profile with every fragrance in the collection.",
+                      "restart_label": "Retake the quest",
+                      "xp_per_answer": 100,
+                      "questions": [
+                          {
+                              "id": "energy",
+                              "prompt": "What kind of energy do you naturally bring into a room?",
+                              "hint": "Choose the answer that feels most like you, not the one you think sounds best.",
+                              "options": [
+                                  {"label": "Sparkling & social", "emoji": "✨", "scores": {"citrus": 3, "fresh": 3, "floral": 1}},
+                                  {"label": "Calm & composed", "emoji": "🌙", "scores": {"woody": 3, "musk": 2}},
+                                  {"label": "Bold & magnetic", "emoji": "🔥", "scores": {"amber": 4, "spicy": 3}},
+                                  {"label": "Creative & dreamy", "emoji": "🎨", "scores": {"floral": 3, "sweet": 2, "fruity": 1}},
+                              ],
+                          },
+                          {
+                              "id": "place",
+                              "prompt": "Which place instantly feels like an escape?",
+                              "hint": "Your favorite atmosphere reveals the scent families you may enjoy most.",
+                              "options": [
+                                  {"label": "Sea cliffs", "emoji": "🌊", "scores": {"aquatic": 4, "fresh": 3, "citrus": 1}},
+                                  {"label": "Deep forest", "emoji": "🌲", "scores": {"woody": 4, "green": 3}},
+                                  {"label": "City after dark", "emoji": "🌃", "scores": {"amber": 3, "musk": 2, "spicy": 2}},
+                                  {"label": "Blooming garden", "emoji": "🌸", "scores": {"floral": 4, "green": 2, "fruity": 1}},
+                              ],
+                          },
+                          {
+                              "id": "style",
+                              "prompt": "Which style direction is closest to your wardrobe?",
+                              "hint": "Think about the look you return to when you want to feel most confident.",
+                              "options": [
+                                  {"label": "Crisp minimalism", "emoji": "◻️", "scores": {"fresh": 3, "musk": 2, "aquatic": 1}},
+                                  {"label": "Classic tailoring", "emoji": "🕴️", "scores": {"woody": 3, "aromatic": 2, "musk": 1}},
+                                  {"label": "Statement fashion", "emoji": "💎", "scores": {"amber": 4, "spicy": 3, "sweet": 1}},
+                                  {"label": "Soft romanticism", "emoji": "🩰", "scores": {"floral": 4, "sweet": 3, "musk": 1}},
+                              ],
+                          },
+                          {
+                              "id": "occasion",
+                              "prompt": "When do you most want your fragrance to make an impact?",
+                              "hint": "A signature scent can have a different job depending on the moment.",
+                              "options": [
+                                  {"label": "Everyday confidence", "emoji": "☀️", "scores": {"fresh": 3, "aromatic": 2, "citrus": 1}},
+                                  {"label": "Date night", "emoji": "❤️", "scores": {"floral": 3, "musk": 3, "sweet": 2}},
+                                  {"label": "Celebration", "emoji": "🥂", "scores": {"citrus": 3, "amber": 2, "fruity": 2}},
+                                  {"label": "Late evening", "emoji": "🌌", "scores": {"amber": 4, "woody": 2, "spicy": 2}},
+                              ],
+                          },
+                          {
+                              "id": "sweetness",
+                              "prompt": "How much sweetness feels right on your skin?",
+                              "hint": "There is no correct intensity—only the one you enjoy wearing.",
+                              "options": [
+                                  {"label": "Airy & clean", "emoji": "🫧", "scores": {"fresh": 3, "aquatic": 2, "musk": 1}},
+                                  {"label": "Subtle warmth", "emoji": "☁️", "scores": {"musk": 3, "floral": 2, "amber": 1}},
+                                  {"label": "Gourmand comfort", "emoji": "🍮", "scores": {"sweet": 5, "amber": 3, "fruity": 1}},
+                                  {"label": "Spiced resin", "emoji": "🧡", "scores": {"spicy": 4, "amber": 4, "woody": 1}},
+                              ],
+                          },
+                          {
+                              "id": "identity",
+                              "prompt": "Which word would a close friend use for you?",
+                              "hint": "Your final answer completes your scent identity profile.",
+                              "options": [
+                                  {"label": "Adventurous", "emoji": "🧭", "scores": {"citrus": 2, "aquatic": 2, "woody": 2}},
+                                  {"label": "Confident", "emoji": "🦁", "scores": {"amber": 4, "musk": 2, "spicy": 1}},
+                                  {"label": "Thoughtful", "emoji": "📚", "scores": {"woody": 3, "green": 2, "aromatic": 2}},
+                                  {"label": "Playful", "emoji": "🎈", "scores": {"fruity": 4, "sweet": 2, "floral": 1, "citrus": 1}},
+                              ],
+                          },
+                      ],
+                      "catalog": [
+                          {
+                              "brand": "Chanel",
+                              "model": "Bleu de Chanel Eau de Parfum",
+                              "subtitle": "Polished woods with luminous freshness",
+                              "emoji": "🔷",
+                              "description": "A versatile match for composed personalities who want freshness with a refined woody signature.",
+                              "notes": ["Citrus", "Incense", "Sandalwood"],
+                              "badges": ["Versatile", "Polished"],
+                              "traits": {"fresh": 3, "citrus": 2, "woody": 4, "aromatic": 4, "amber": 2, "musk": 2},
+                          },
+                          {
+                              "brand": "Dior",
+                              "model": "Sauvage Eau de Parfum",
+                              "subtitle": "Fresh spice with confident depth",
+                              "emoji": "🌌",
+                              "description": "A modern, energetic profile balancing bright bergamot, aromatic spice and warm woods.",
+                              "notes": ["Bergamot", "Pepper", "Ambroxan"],
+                              "badges": ["Bold", "Modern"],
+                              "traits": {"fresh": 3, "citrus": 2, "woody": 3, "aromatic": 4, "spicy": 3, "amber": 2},
+                          },
+                          {
+                              "brand": "Yves Saint Laurent",
+                              "model": "Libre Eau de Parfum",
+                              "subtitle": "Confident florals with warm vanilla",
+                              "emoji": "✨",
+                              "description": "A free-spirited floral for confident identities who enjoy elegance with a warm, sensual edge.",
+                              "notes": ["Lavender", "Orange blossom", "Vanilla"],
+                              "badges": ["Confident", "Elegant"],
+                              "traits": {"floral": 4, "citrus": 2, "sweet": 2, "amber": 3, "musk": 2, "aromatic": 1},
+                          },
+                          {
+                              "brand": "Maison Francis Kurkdjian",
+                              "model": "Baccarat Rouge 540",
+                              "subtitle": "Airy amber with unforgettable presence",
+                              "emoji": "♦️",
+                              "description": "A magnetic statement scent for bold personalities drawn to radiant sweetness and amber woods.",
+                              "notes": ["Saffron", "Amberwood", "Cedar"],
+                              "badges": ["Magnetic", "Statement"],
+                              "traits": {"amber": 5, "sweet": 4, "woody": 2, "floral": 2, "musk": 3, "spicy": 1},
+                          },
+                          {
+                              "brand": "Jo Malone London",
+                              "model": "Wood Sage & Sea Salt",
+                              "subtitle": "Mineral air and effortless woods",
+                              "emoji": "🌊",
+                              "description": "An airy, natural match for relaxed personalities inspired by coastlines and open spaces.",
+                              "notes": ["Sea salt", "Sage", "Mineral woods"],
+                              "badges": ["Airy", "Effortless"],
+                              "traits": {"aquatic": 5, "fresh": 4, "woody": 2, "green": 2, "citrus": 1},
+                          },
+                          {
+                              "brand": "Giorgio Armani",
+                              "model": "Acqua di Giò Profondo",
+                              "subtitle": "Deep marine freshness",
+                              "emoji": "💧",
+                              "description": "A crisp aquatic profile for energetic explorers who prefer freshness with aromatic structure.",
+                              "notes": ["Marine accord", "Citrus", "Cypress"],
+                              "badges": ["Fresh", "Energetic"],
+                              "traits": {"aquatic": 5, "fresh": 4, "citrus": 3, "aromatic": 3, "woody": 2},
+                          },
+                          {
+                              "brand": "Tom Ford",
+                              "model": "Oud Wood",
+                              "subtitle": "Smooth spice and rare woods",
+                              "emoji": "🪵",
+                              "description": "A refined, mysterious choice for thoughtful personalities attracted to warm spice and elegant woods.",
+                              "notes": ["Oud", "Cardamom", "Sandalwood"],
+                              "badges": ["Refined", "Mysterious"],
+                              "traits": {"woody": 5, "spicy": 4, "amber": 3, "aromatic": 2, "musk": 2},
+                          },
+                          {
+                              "brand": "Lancôme",
+                              "model": "La Vie Est Belle",
+                              "subtitle": "Joyful iris and gourmand sweetness",
+                              "emoji": "🎀",
+                              "description": "A warm, playful recommendation for personalities who love expressive florals and comforting sweetness.",
+                              "notes": ["Iris", "Praline", "Vanilla"],
+                              "badges": ["Joyful", "Gourmand"],
+                              "traits": {"sweet": 5, "floral": 4, "fruity": 3, "amber": 3, "musk": 1},
+                          },
+                      ],
+                  },
+              ],
+          }
+
+          project = (
+              Project.objects.select_related("organization", "conversation")
+              .filter(name__iexact="Flavor")
+              .order_by("-created_at")
+              .first()
+          )
+          if not project:
+              raise RuntimeError("Flavor project was not found")
+
+          existing_quiz = next(
+              (
+                  section
+                  for section in (project.app_spec or {}).get("sections", [])
+                  if section.get("type") == "recommendation_quiz"
+              ),
+              None,
+          )
+          already_complete = bool(
+              project.version >= 3
+              and existing_quiz
+              and len(existing_quiz.get("questions", [])) >= 6
+              and len(existing_quiz.get("catalog", [])) >= 8
+          )
+
+          before_credits = project.organization.credits
+          before_version = project.version
+          before_spec = project.app_spec
+          before_status = project.status
+          before_error = project.last_build_error
+          preview_root = Path(settings.APP_DATA_ROOT) / "preview" / project.slug
+          backup_root = Path(tempfile.mkdtemp(prefix="flavor-preview-backup-")) / "preview"
+          if preview_root.exists():
+              shutil.copytree(preview_root, backup_root)
+
+          deployment = None
+          try:
+              if not already_complete:
+                  project.app_spec = sanitize_spec(spec)
+                  project.version = max(project.version + 1, 3)
+                  project.status = "building"
+                  project.last_build_error = ""
+                  project.save(
+                      update_fields=[
+                          "app_spec",
+                          "version",
+                          "status",
+                          "last_build_error",
+                          "updated_at",
+                      ]
+                  )
+                  deployment = Deployment.objects.create(
+                      project=project,
+                      environment="preview",
+                      status="building",
+                      version=project.version,
+                      url=project.preview_url,
+                  )
+                  root, checksum = generate_preview(project)
+                  sync_project_repository(project, root)
+                  project.status = "preview"
+                  project.last_build_error = ""
+                  project.save(
+                      update_fields=["status", "last_build_error", "updated_at"]
+                  )
+                  deployment.mark_success(project.preview_url, checksum)
+                  Message.objects.create(
+                      conversation=project.conversation,
+                      role="assistant",
+                      status="done",
+                      content=(
+                          "Flavor is now a complete interactive scent-discovery experience. "
+                          "It includes a six-step identity quiz, XP and levels, a personal scent profile, "
+                          "ranked fragrance matches, favorites and saved progress."
+                      ),
+                      metadata={
+                          "action": "preview_ready",
+                          "preview_url": project.preview_url,
+                          "version": project.version,
+                          "credits_used": 0,
+                          "interactive_rebuild": True,
+                      },
+                  )
+              else:
+                  root = preview_root
+                  sync_project_repository(project, root)
+
+              project.refresh_from_db()
+              project.organization.refresh_from_db()
+              if project.organization.credits != before_credits:
+                  raise RuntimeError(
+                      f"Credits changed unexpectedly: {before_credits} -> {project.organization.credits}"
+                  )
+              if project.status != "preview" or project.version < 3:
+                  raise RuntimeError(
+                      f"Unexpected project state: {project.status} v{project.version}"
+                  )
+              if project.last_build_error:
+                  raise RuntimeError(
+                      f"Project still contains a build error: {project.last_build_error}"
+                  )
+
+              config_path = preview_root / "config.js"
+              app_path = preview_root / "app.js"
+              styles_path = preview_root / "styles.css"
+              if not all(path.exists() for path in (config_path, app_path, styles_path)):
+                  raise RuntimeError("Generated interactive build files are missing")
+
+              config_text = config_path.read_text(encoding="utf-8")
+              prefix = "window.APP_SPEC = "
+              if not config_text.startswith(prefix) or not config_text.endswith(";"):
+                  raise RuntimeError("Generated config.js has an invalid wrapper")
+              generated_spec = json.loads(config_text[len(prefix):-1])
+              quiz = next(
+                  section
+                  for section in generated_spec["sections"]
+                  if section["type"] == "recommendation_quiz"
+              )
+              if len(quiz.get("questions", [])) != 6:
+                  raise RuntimeError("Flavor does not contain exactly six quiz questions")
+              if any(len(question.get("options", [])) != 4 for question in quiz["questions"]):
+                  raise RuntimeError("Every Flavor question must contain exactly four options")
+              if len(quiz.get("catalog", [])) != 8:
+                  raise RuntimeError("Flavor does not contain exactly eight fragrances")
+              if not all(
+                  option.get("scores")
+                  for question in quiz["questions"]
+                  for option in question["options"]
+              ):
+                  raise RuntimeError("One or more quiz options lost their score vectors")
+              if not all(item.get("traits") for item in quiz["catalog"]):
+                  raise RuntimeError("One or more fragrances lost their trait vectors")
+
+              javascript = app_path.read_text(encoding="utf-8")
+              for marker in (
+                  "function calculateResults",
+                  "localStorage.setItem",
+                  "data-favorite",
+                  "function profileMarkup",
+                  "function similarity",
+              ):
+                  if marker not in javascript:
+                      raise RuntimeError(f"Generated runtime is missing {marker}")
+
+              stylesheet = styles_path.read_text(encoding="utf-8")
+              for marker in (".quiz-shell", ".match-card", ".trait-fill", ".favorite"):
+                  if marker not in stylesheet:
+                      raise RuntimeError(f"Generated stylesheet is missing {marker}")
+
+              cache_buster = f"?v={project.version}-{project.updated_at.timestamp()}"
+              public_config = requests.get(
+                  project.preview_url + "config.js" + cache_buster,
+                  headers={"Cache-Control": "no-cache"},
+                  timeout=30,
+              )
+              public_config.raise_for_status()
+              if "recommendation_quiz" not in public_config.text:
+                  raise RuntimeError("Public preview is not serving the interactive specification")
+              public_app = requests.get(
+                  project.preview_url + "app.js" + cache_buster,
+                  headers={"Cache-Control": "no-cache"},
+                  timeout=30,
+              )
+              public_app.raise_for_status()
+              if "function calculateResults" not in public_app.text:
+                  raise RuntimeError("Public preview is not serving the interactive runtime")
+
+              headers = {
+                  "Authorization": f"Bearer {settings.GITHUB_TOKEN}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              }
+              repository = requests.get(
+                  f"https://api.github.com/repos/{settings.GITHUB_OWNER}/{project.repo_name}",
+                  headers=headers,
+                  timeout=30,
+              )
+              repository.raise_for_status()
+              if not repository.json().get("private"):
+                  raise RuntimeError("Flavor repository is not private")
+              repository_spec = requests.get(
+                  f"https://api.github.com/repos/{settings.GITHUB_OWNER}/{project.repo_name}/contents/app-spec.json",
+                  headers=headers,
+                  timeout=30,
+              )
+              repository_spec.raise_for_status()
+              decoded_spec = base64.b64decode(
+                  repository_spec.json()["content"]
+              ).decode("utf-8")
+              if "recommendation_quiz" not in decoded_spec:
+                  raise RuntimeError("Private repository was not updated with the interactive spec")
+
+              print(
+                  "FLAVOR_INTERACTIVE_OK",
+                  json.dumps(
+                      {
+                          "version_before": before_version,
+                          "version_after": project.version,
+                          "credits_before": before_credits,
+                          "credits_after": project.organization.credits,
+                          "status": project.status,
+                          "questions": len(quiz["questions"]),
+                          "options_per_question": [
+                              len(question["options"]) for question in quiz["questions"]
+                          ],
+                          "catalog_items": len(quiz["catalog"]),
+                          "features": generated_spec["features"],
+                          "preview_url": project.preview_url,
+                          "repo_url": project.repo_url,
+                          "repository_private": repository.json()["private"],
+                          "public_runtime_verified": True,
+                          "already_complete": already_complete,
+                      },
+                      ensure_ascii=False,
+                  ),
+              )
+          except Exception as exc:
+              if not already_complete:
+                  project.app_spec = before_spec
+                  project.version = before_version
+                  project.status = before_status
+                  project.last_build_error = before_error
+                  project.save(
+                      update_fields=[
+                          "app_spec",
+                          "version",
+                          "status",
+                          "last_build_error",
+                          "updated_at",
+                      ]
+                  )
+                  if preview_root.exists():
+                      shutil.rmtree(preview_root)
+                  if backup_root.exists():
+                      shutil.copytree(backup_root, preview_root)
+                  if deployment:
+                      deployment.status = "failed"
+                      deployment.log = str(exc)[:4000]
+                      deployment.save(
+                          update_fields=["status", "log", "updated_at"]
+                      )
+              raise
+          finally:
+              shutil.rmtree(backup_root.parent, ignore_errors=True)
+          PY
+          REMOTE
