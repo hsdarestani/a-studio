@@ -6,6 +6,10 @@ on:
     paths:
       - .github/workflows/verify-builder-layout-production.yml
 
+concurrency:
+  group: verify-builder-layout-production
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -39,7 +43,7 @@ jobs:
           from django.conf import settings
           from django.contrib.auth import get_user_model
           from django.urls import reverse
-          from core.models import Deployment, Membership, Project
+          from core.models import Membership, Project
           from core.services.generator import generate_preview
           from core.services.github import sync_project_repository
 
@@ -80,13 +84,17 @@ jobs:
           email = os.environ["TEST_EMAIL"]
           password = os.environ["TEST_PASSWORD"]
           User = get_user_model()
-          user, _created = User.objects.get_or_create(
+          User.objects.filter(
+              username__startswith="builder-layout-",
+              username__endswith="@example.invalid",
+          ).delete()
+          user = User.objects.create_user(
               username=email,
-              defaults={"email": email, "first_name": "Builder", "last_name": "Smoke"},
+              email=email,
+              password=password,
+              first_name="Builder",
+              last_name="Smoke",
           )
-          user.email = email
-          user.set_password(password)
-          user.save()
           Membership.objects.update_or_create(
               organization=project.organization,
               user=user,
@@ -110,13 +118,16 @@ jobs:
           test -n "$PROJECT_PATH"
           echo "project_path=$PROJECT_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Install Playwright
+      - name: Prepare installed Chrome
         run: |
           mkdir -p /tmp/builder-browser
           cd /tmp/builder-browser
           npm init -y >/dev/null
-          npm install playwright >/dev/null
-          npx playwright install --with-deps chromium >/dev/null
+          npm install playwright-core >/dev/null
+          CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || command -v microsoft-edge || true)"
+          test -n "$CHROME_PATH"
+          "$CHROME_PATH" --version
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
 
       - name: Verify composer and interactive preview in a real browser
         env:
@@ -124,12 +135,16 @@ jobs:
         run: |
           cd /tmp/builder-browser
           cat > smoke.js <<'JS'
-          const { chromium } = require('playwright');
+          const { chromium } = require('playwright-core');
 
           (async () => {
             const baseUrl = process.env.BASE_URL;
             const projectPath = process.env.PROJECT_PATH;
-            const browser = await chromium.launch({ headless: true });
+            const browser = await chromium.launch({
+              headless: true,
+              executablePath: process.env.CHROME_PATH,
+              args: ['--no-sandbox'],
+            });
             const context = await browser.newContext({ viewport: { width: 1792, height: 856 } });
             const page = await context.newPage();
 
