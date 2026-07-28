@@ -30,26 +30,73 @@ REDIS_URL=redis://redis:6379/0
 OPENAI_MODEL=gpt-5-mini
 APP_PUBLIC_URL=https://studio.aplus-solution.de
 APP_ROOT_DOMAIN=studio.aplus-solution.de
-DEFAULT_FROM_EMAIL=studio@aplus-solution.de
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.strato.de
+EMAIL_PORT=465
+EMAIL_USE_SSL=1
+EMAIL_USE_TLS=0
+EMAIL_HOST_USER=app@aplus-solution.de
+EMAIL_HOST_PASSWORD=
+DEFAULT_FROM_EMAIL=A+ Studio <app@aplus-solution.de>
+SERVER_EMAIL=A+ Studio <app@aplus-solution.de>
+BILLING_CONTACT_EMAIL=app@aplus-solution.de
 GITHUB_OWNER=hsdarestani
 GITHUB_REPOSITORY_PREFIX=astudio-app-
 ENV
 fi
 
-python3 - "$ENV_FILE" "${OPENAI_API_KEY_B64}" <<'PY'
-import base64, pathlib, sys
+python3 - "$ENV_FILE" "${OPENAI_API_KEY_B64:-}" "${EMAIL_PASSWORD_B64:-}" "${GITHUB_TOKEN_B64:-}" <<'PY'
+import base64
+import pathlib
+import sys
+
 path = pathlib.Path(sys.argv[1])
-value = base64.b64decode(sys.argv[2]).decode()
+encoded = {
+    "OPENAI_API_KEY": sys.argv[2],
+    "EMAIL_HOST_PASSWORD": sys.argv[3],
+    "GITHUB_TOKEN": sys.argv[4],
+}
+defaults = {
+    "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+    "EMAIL_HOST": "smtp.strato.de",
+    "EMAIL_PORT": "465",
+    "EMAIL_USE_SSL": "1",
+    "EMAIL_USE_TLS": "0",
+    "EMAIL_HOST_USER": "app@aplus-solution.de",
+    "DEFAULT_FROM_EMAIL": "A+ Studio <app@aplus-solution.de>",
+    "SERVER_EMAIL": "A+ Studio <app@aplus-solution.de>",
+    "BILLING_CONTACT_EMAIL": "app@aplus-solution.de",
+}
+
 lines = path.read_text().splitlines()
-key = "OPENAI_API_KEY"
-updated = False
-for i, line in enumerate(lines):
-    if line.startswith(key + "="):
-        lines[i] = f"{key}={value}"
-        updated = True
-if not updated:
-    lines.append(f"{key}={value}")
-path.write_text("\n".join(lines) + "\n")
+values = {}
+order = []
+for line in lines:
+    if not line or line.lstrip().startswith("#") or "=" not in line:
+        order.append((None, line))
+        continue
+    key, value = line.split("=", 1)
+    values[key] = value
+    order.append((key, None))
+
+for key, value in defaults.items():
+    values.setdefault(key, value)
+for key, value in encoded.items():
+    if value:
+        values[key] = base64.b64decode(value).decode()
+
+written = set()
+output = []
+for key, raw in order:
+    if key is None:
+        output.append(raw)
+    elif key not in written:
+        output.append(f"{key}={values.get(key, '')}")
+        written.add(key)
+for key, value in values.items():
+    if key not in written:
+        output.append(f"{key}={value}")
+path.write_text("\n".join(output) + "\n")
 PY
 
 ln -sfn "$ENV_FILE" "$RELEASE_DIR/.env"
