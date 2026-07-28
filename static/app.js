@@ -29,6 +29,12 @@
   let reloadScheduled = false;
 
   const scrollDown = () => { stream.scrollTop = stream.scrollHeight; };
+  const cacheSafePreviewUrl = (url, version = Date.now()) => {
+    const target = new URL(url, window.location.origin);
+    target.searchParams.set('preview', '1');
+    target.searchParams.set('v', String(version));
+    return target.toString();
+  };
   scrollDown();
 
   const escapeHtml = value => String(value || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -95,14 +101,15 @@
         article.querySelector('.message-content').innerHTML = renderText(data.content);
         article.querySelector('small').textContent = data.status === 'failed' ? copy.failed : copy.justNow;
         if (data.metadata && data.metadata.preview_url) {
+          const previewUrl = cacheSafePreviewUrl(data.metadata.preview_url, data.metadata.version || Date.now());
           const link = document.createElement('a');
           link.className = 'inline-action';
-          link.href = data.metadata.preview_url;
+          link.href = previewUrl;
           link.target = '_blank';
           link.rel = 'noopener';
           link.textContent = copy.openPreview;
           article.insertBefore(link, article.querySelector('small'));
-          if (frame) frame.src = `${data.metadata.preview_url}?v=${Date.now()}`;
+          if (frame) frame.src = previewUrl;
         }
         submit.disabled = false;
         textarea.disabled = false;
