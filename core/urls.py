@@ -14,7 +14,5 @@ urlpatterns = [
     path("projects/<uuid:pk>/download/", views.download_build, name="download_build"),
     path("projects/<uuid:pk>/store-submission/", views.request_store_submission, name="request_store_submission"),
     path("billing/", views.billing, name="billing"),
-    path("billing/checkout/<str:plan>/", views.billing_checkout, name="billing_checkout"),
-    path("api/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
     path("api/tls/allow/", views.tls_allow, name="tls_allow"),
 ]
