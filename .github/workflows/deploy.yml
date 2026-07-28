@@ -45,8 +45,14 @@ jobs:
           OPENAI_API_KEY_B64="$(printf '%s' "$OPENAI_API_KEY" | base64 -w0)"
           EMAIL_PASSWORD_B64="$(printf '%s' "$EMAIL_PASSWORD" | base64 -w0)"
           GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN_VALUE" | base64 -w0)"
+          set +e
           sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
-            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' EMAIL_PASSWORD_B64='$EMAIL_PASSWORD_B64' GITHUB_TOKEN_B64='$GITHUB_TOKEN_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" < scripts/deploy.sh
+            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' EMAIL_PASSWORD_B64='$EMAIL_PASSWORD_B64' GITHUB_TOKEN_B64='$GITHUB_TOKEN_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" \
+            < scripts/deploy.sh > /tmp/a-studio-remote-deploy.log 2>&1
+          status=$?
+          set -e
+          tail -n 260 /tmp/a-studio-remote-deploy.log
+          exit "$status"
       - name: Public HTTPS health check
         run: |
           for i in $(seq 1 30); do

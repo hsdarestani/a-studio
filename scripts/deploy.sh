@@ -5,6 +5,28 @@ APP_DIR=/opt/a-studio
 RELEASE_DIR="$APP_DIR/releases/${GITHUB_SHA:-manual}"
 CURRENT_DIR="$APP_DIR/current"
 
+show_diagnostics() {
+  status=$?
+  trap - ERR
+  echo "Deployment failed with exit code $status near line ${BASH_LINENO[0]:-unknown}."
+  if command -v docker >/dev/null 2>&1; then
+    cd "$CURRENT_DIR" 2>/dev/null || true
+    echo "--- Docker version ---"
+    docker version || true
+    docker compose version || true
+    echo "--- Compose validation ---"
+    docker compose config >/tmp/a-studio-compose-config.log 2>&1 || cat /tmp/a-studio-compose-config.log || true
+    echo "--- Container status ---"
+    docker compose ps -a || true
+    echo "--- Recent service logs ---"
+    docker compose logs --no-color --tail=120 db redis web worker caddy || true
+    echo "--- Listening ports ---"
+    ss -ltnp 2>/dev/null | grep -E ':(22|80|443|8000)\b' || true
+  fi
+  exit "$status"
+}
+trap show_diagnostics ERR
+
 mkdir -p "$RELEASE_DIR"
 tar -xzf /tmp/a-studio-release.tar.gz -C "$RELEASE_DIR"
 
@@ -37,8 +59,8 @@ EMAIL_USE_SSL=1
 EMAIL_USE_TLS=0
 EMAIL_HOST_USER=app@aplus-solution.de
 EMAIL_HOST_PASSWORD=
-DEFAULT_FROM_EMAIL=A+ Studio <app@aplus-solution.de>
-SERVER_EMAIL=A+ Studio <app@aplus-solution.de>
+DEFAULT_FROM_EMAIL=app@aplus-solution.de
+SERVER_EMAIL=app@aplus-solution.de
 BILLING_CONTACT_EMAIL=app@aplus-solution.de
 GITHUB_OWNER=hsdarestani
 GITHUB_REPOSITORY_PREFIX=astudio-app-
@@ -63,8 +85,8 @@ defaults = {
     "EMAIL_USE_SSL": "1",
     "EMAIL_USE_TLS": "0",
     "EMAIL_HOST_USER": "app@aplus-solution.de",
-    "DEFAULT_FROM_EMAIL": "A+ Studio <app@aplus-solution.de>",
-    "SERVER_EMAIL": "A+ Studio <app@aplus-solution.de>",
+    "DEFAULT_FROM_EMAIL": "app@aplus-solution.de",
+    "SERVER_EMAIL": "app@aplus-solution.de",
     "BILLING_CONTACT_EMAIL": "app@aplus-solution.de",
 }
 
@@ -103,19 +125,18 @@ ln -sfn "$ENV_FILE" "$RELEASE_DIR/.env"
 ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
 cd "$CURRENT_DIR"
 
+docker compose config >/tmp/a-studio-compose-config.log
 docker compose up -d --build --remove-orphans
 
 docker image prune -f >/dev/null 2>&1 || true
 
 for i in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1/health/ >/dev/null; then
-    echo "A+ Studio is healthy"
+  if docker compose exec -T web curl -fsS http://127.0.0.1:8000/health/ >/dev/null; then
+    echo "A+ Studio application is healthy"
     exit 0
   fi
   sleep 5
 done
 
 echo "Deployment health check failed"
-docker compose ps
-docker compose logs --tail=150 web caddy
-exit 1
+false
