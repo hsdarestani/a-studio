@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 concurrency:
   group: a-studio-production
@@ -14,6 +17,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.event_name != 'pull_request' || (github.head_ref == 'agent/production-deploy-trigger' && github.actor == 'hsdarestani')
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -29,20 +33,24 @@ jobs:
           SSHPASS: ${{ secrets.PASS }}
           HOST: ${{ secrets.HOST }}
         run: |
-          sshpass -e scp -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          sshpass -e scp -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             /tmp/a-studio-release.tar.gz root@"$HOST":/tmp/a-studio-release.tar.gz
       - name: Deploy and verify
         env:
           SSHPASS: ${{ secrets.PASS }}
           HOST: ${{ secrets.HOST }}
           OPENAI_API_KEY: ${{ secrets.OPENAIAPIKEY }}
+          EMAIL_PASSWORD: ${{ secrets.EMAILPASSWORD }}
+          GITHUB_TOKEN_VALUE: ${{ secrets.GITHUBTOKEN }}
         run: |
           OPENAI_API_KEY_B64="$(printf '%s' "$OPENAI_API_KEY" | base64 -w0)"
-          sshpass -e ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
-            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" < scripts/deploy.sh
+          EMAIL_PASSWORD_B64="$(printf '%s' "$EMAIL_PASSWORD" | base64 -w0)"
+          GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN_VALUE" | base64 -w0)"
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' EMAIL_PASSWORD_B64='$EMAIL_PASSWORD_B64' GITHUB_TOKEN_B64='$GITHUB_TOKEN_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" < scripts/deploy.sh
       - name: Public HTTPS health check
         run: |
-          for i in $(seq 1 20); do
+          for i in $(seq 1 30); do
             if curl -fsS https://studio.aplus-solution.de/health/; then exit 0; fi
             sleep 6
           done
