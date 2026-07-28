@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -43,7 +44,9 @@ def signup(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
     form = SignUpForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
+
+if request.method == "POST" and form.is_valid():
+    with transaction.atomic():
         user = form.save()
         organization = Organization.objects.create(
             name=form.cleaned_data["company_name"],
@@ -59,8 +62,8 @@ def signup(request):
             balance_after=20,
             description=_("Welcome credits"),
         )
-        login(request, user)
-        return redirect("project_create")
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    return redirect("project_create")
     return render(request, "registration/signup.html", {"form": form})
 
 

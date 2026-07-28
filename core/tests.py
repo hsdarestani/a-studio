@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from .models import Conversation, Membership, Organization, Project
 from .services.ai import initial_spec, sanitize_spec
 from .services.generator import generate_preview, publish_project
@@ -55,3 +56,34 @@ class PricingTests(TestCase):
         size = estimate_size(before, after)
         self.assertEqual(size, "advanced")
         self.assertEqual(cost_for_size(size), 7)
+
+
+class SignupTests(TestCase):
+    def test_email_signup_logs_in_with_multiple_auth_backends(self):
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "full_name": "Max Mustermann",
+                "email": "max@example.com",
+                "company_name": "Muster GmbH",
+                "password1": "A-very-safe-password-2026!",
+                "password2": "A-very-safe-password-2026!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("project_create"), fetch_redirect_response=False)
+        user = User.objects.get(email="max@example.com")
+        self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
+        self.assertEqual(
+            self.client.session["_auth_user_backend"],
+            "django.contrib.auth.backends.ModelBackend",
+        )
+        organization = Organization.objects.get(owner=user)
+        self.assertEqual(organization.credits, 20)
+        self.assertTrue(
+            Membership.objects.filter(
+                organization=organization,
+                user=user,
+                role="owner",
+            ).exists()
+        )
