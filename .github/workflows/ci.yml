@@ -33,6 +33,10 @@ jobs:
           python manage.py check
           python manage.py makemigrations --check --dry-run
           python manage.py test
+      - name: Validate generated app runtime
+        run: |
+          cat core/services/runtime-1.js core/services/runtime-2.js core/services/runtime-3.js > /tmp/a-studio-runtime.js
+          node --check /tmp/a-studio-runtime.js
       - name: Compile Python
         run: python -m compileall -q .
       - name: Validate Caddy configuration
