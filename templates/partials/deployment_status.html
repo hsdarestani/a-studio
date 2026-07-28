@@ -1,0 +1,1 @@
+{% load i18n %}{% if deploy.status == 'queued' %}{% trans "Queued" %}{% elif deploy.status == 'building' %}{% trans "Building" %}{% elif deploy.status == 'success' %}{% trans "Successful" %}{% elif deploy.status == 'failed' %}{% trans "Failed" %}{% elif deploy.status == 'rolled_back' %}{% trans "Rolled back" %}{% else %}{{ deploy.status }}{% endif %}

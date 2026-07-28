@@ -1,3 +1,4 @@
+import base64
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -29,6 +30,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.apple",
     "core",
 ]
 
@@ -36,9 +42,11 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -60,16 +68,16 @@ TEMPLATES = [{
 WSGI_APPLICATION = "studio.wsgi.application"
 ASGI_APPLICATION = "studio.asgi.application"
 
-db_url = urlparse(env("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"))
-if db_url.scheme.startswith("postgres"):
+_db_url = urlparse(env("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"))
+if _db_url.scheme.startswith("postgres"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": db_url.path.lstrip("/"),
-            "USER": db_url.username,
-            "PASSWORD": db_url.password,
-            "HOST": db_url.hostname,
-            "PORT": db_url.port or 5432,
+            "NAME": _db_url.path.lstrip("/"),
+            "USER": _db_url.username,
+            "PASSWORD": _db_url.password,
+            "HOST": _db_url.hostname,
+            "PORT": _db_url.port or 5432,
             "CONN_MAX_AGE": 60,
         }
     }
@@ -83,7 +91,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "de"
+LANGUAGES = [("de", "Deutsch"), ("en", "English")]
+LOCALE_PATHS = [BASE_DIR / "locale"]
+LANGUAGE_COOKIE_NAME = "astudio_language"
 TIME_ZONE = "Europe/Berlin"
 USE_I18N = True
 USE_TZ = True
@@ -99,6 +110,53 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "landing"
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_UNIQUE_EMAIL = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_LOGIN_ON_GET = False
+
+GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = env("GOOGLE_OAUTH_CLIENT_SECRET")
+APPLE_OAUTH_CLIENT_ID = env("APPLE_OAUTH_CLIENT_ID")
+APPLE_OAUTH_KEY_ID = env("APPLE_OAUTH_KEY_ID")
+APPLE_OAUTH_TEAM_ID = env("APPLE_OAUTH_TEAM_ID")
+APPLE_OAUTH_PRIVATE_KEY_B64 = env("APPLE_OAUTH_PRIVATE_KEY_B64")
+try:
+    APPLE_OAUTH_PRIVATE_KEY = base64.b64decode(APPLE_OAUTH_PRIVATE_KEY_B64).decode() if APPLE_OAUTH_PRIVATE_KEY_B64 else ""
+except (ValueError, UnicodeDecodeError):
+    APPLE_OAUTH_PRIVATE_KEY = ""
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+        "OAUTH_PKCE_ENABLED": True,
+        "VERIFIED_EMAIL": True,
+    },
+    "apple": {"VERIFIED_EMAIL": True},
+}
+if GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["google"]["APPS"] = [{
+        "client_id": GOOGLE_OAUTH_CLIENT_ID,
+        "secret": GOOGLE_OAUTH_CLIENT_SECRET,
+        "key": "",
+    }]
+if all([APPLE_OAUTH_CLIENT_ID, APPLE_OAUTH_KEY_ID, APPLE_OAUTH_TEAM_ID, APPLE_OAUTH_PRIVATE_KEY]):
+    SOCIALACCOUNT_PROVIDERS["apple"]["APPS"] = [{
+        "client_id": APPLE_OAUTH_CLIENT_ID,
+        "secret": APPLE_OAUTH_KEY_ID,
+        "key": APPLE_OAUTH_TEAM_ID,
+        "settings": {"certificate_key": APPLE_OAUTH_PRIVATE_KEY},
+    }]
 
 CELERY_BROKER_URL = env("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL

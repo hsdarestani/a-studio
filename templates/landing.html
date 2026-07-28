@@ -1,42 +1,198 @@
 {% extends 'base.html' %}
-{% block title %}A+ Studio — Build your app by chatting{% endblock %}
-{% block body_class %}landing-body{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "AI app development for businesses" %} — A+ Studio{% endblock %}
+{% block meta_description %}{% trans "A+ Studio turns business ideas into production-ready apps with AI development, private source code, managed hosting and human support." %}{% endblock %}
+{% block body_class %}landing-body brand-theme{% endblock %}
 {% block content %}
-<header class="landing-nav">
-  <a class="logo light" href="/"><span>A+</span> Studio</a>
-  <div><a class="text-link" href="{% url 'login' %}">Log in</a><a class="button small" href="{% url 'signup' %}">Start building</a></div>
-</header>
-<main class="landing-main">
-  <section class="landing-hero">
-    <div class="eyebrow">AI SOFTWARE FACTORY FOR REAL BUSINESSES</div>
-    <h1>Describe the app.<br><em>We build it.</em></h1>
-    <p>Create a production-ready PWA through conversation. Every project gets its own workspace, preview, source repository, version history, deployment pipeline, and optional App Store publishing.</p>
-    <div class="hero-actions"><a class="button" href="{% url 'signup' %}">Build your first app</a><a class="ghost-button" href="#how">See how it works</a></div>
-    <div class="hero-proof"><span>✓ PWA-first</span><span>✓ EU-ready infrastructure</span><span>✓ Human support</span><span>✓ Store publishing add-on</span></div>
-  </section>
-  <section class="visual-stage">
-    <div class="studio-window">
-      <div class="window-bar"><i></i><i></i><i></i><span>studio.aplus-solution.de</span></div>
-      <div class="window-grid">
-        <aside><div class="mini-logo">A+</div><b>Luna Beauty</b><small>Version 1.4</small><nav><span class="active">AI Builder</span><span>App preview</span><span>Deployments</span><span>Settings</span></nav></aside>
-        <div class="mock-chat"><div class="bubble user">Add online booking and show discounted services first.</div><div class="bubble ai"><b>A+ Builder</b><br>I added a mobile booking flow, service filters, and priority sorting for offers. Your safe preview is ready.</div><div class="mock-status"><span>Preview build passed</span><b>Open preview →</b></div></div>
-        <div class="phone"><div class="phone-screen"><div class="phone-top">Luna</div><div class="phone-hero"><small>BEAUTY, YOUR WAY</small><strong>Feel like<br>your best self.</strong><button>Book now</button></div><div class="phone-cards"><i></i><i></i></div></div></div>
+<div class="brand-page">
+  <header class="brand-nav">
+    <a class="brand-lockup" href="/" aria-label="A+ Studio">
+      <span class="brand-mark" role="img" aria-label="A+ Solution GmbH"></span>
+      <span class="brand-name"><strong>A+ Studio</strong><small>by A+ Solution GmbH</small></span>
+    </a>
+    <nav class="brand-nav-links" aria-label="{% trans 'Main navigation' %}">
+      <a href="#process">{% trans "How it works" %}</a>
+      <a href="#platform">{% trans "Platform" %}</a>
+      <a href="#service">{% trans "A+ service" %}</a>
+    </nav>
+    <div class="brand-nav-actions">
+      {% include "partials/language_switcher.html" %}
+      <a class="brand-login" href="{% url 'login' %}">{% trans "Log in" %}</a>
+      <a class="brand-button compact" href="{% url 'signup' %}">{% trans "Start a project" %}</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="brand-hero">
+      <div class="hero-copy">
+        <div class="brand-kicker"><span></span>{% trans "AI APP DEVELOPMENT · MADE IN GERMANY" %}</div>
+        <h1>{% trans "Your app idea." %}<br><em>{% trans "Built intelligently." %}</em><br>{% trans "Managed professionally." %}</h1>
+        <p>{% trans "Describe what your business needs. A+ Studio plans, develops and improves your app through a guided AI workflow—with private source code, safe previews and real human support from A+ Solution." %}</p>
+        <div class="brand-hero-actions">
+          <a class="brand-button" href="{% url 'signup' %}">{% trans "Build your first version" %}<span>↗</span></a>
+          <a class="brand-button secondary" href="#process">{% trans "View the process" %}</a>
+        </div>
+        <div class="brand-trust-row">
+          <span>{% trans "Private repositories" %}</span>
+          <span>{% trans "Preview before publishing" %}</span>
+          <span>{% trans "Hosting in Europe" %}</span>
+        </div>
       </div>
-    </div>
-  </section>
-  <section id="how" class="landing-section">
-    <div class="section-heading"><span>THE COMPLETE LOOP</span><h2>From idea to a living product.</h2></div>
-    <div class="steps-grid">
-      <article><b>01</b><h3>Consult</h3><p>AI and A+ experts clarify what your business actually needs before development starts.</p></article>
-      <article><b>02</b><h3>Build</h3><p>Chat with the builder. Every approved change becomes a versioned, testable app update.</p></article>
-      <article><b>03</b><h3>Preview</h3><p>Nothing touches production first. Review a protected preview and request refinements.</p></article>
-      <article><b>04</b><h3>Publish</h3><p>Launch as a PWA immediately, or let A+ prepare and submit native store packages.</p></article>
-    </div>
-  </section>
-  <section class="landing-section dark-panel">
-    <div><span class="eyebrow">NOT ANOTHER TEMPLATE BUILDER</span><h2>Your app keeps evolving after launch.</h2></div>
-    <div class="feature-list"><span>Private project source</span><span>AI-guided product decisions</span><span>Feature-based pricing</span><span>Managed hosting & backups</span><span>Version history & rollback</span><span>Store submission service</span></div>
-  </section>
-</main>
-<footer class="landing-footer"><span>© 2026 A+ Solution GmbH</span><span>Built in Germany for ambitious businesses.</span></footer>
+
+      <div class="hero-brand-visual" aria-label="{% trans 'A+ Studio product preview' %}">
+        <div class="gold-orbit orbit-one"></div>
+        <div class="gold-orbit orbit-two"></div>
+        <div class="brand-seal">
+          <span class="brand-logo-large" role="img" aria-label="A+ Solution GmbH"></span>
+        </div>
+        <div class="floating-card card-source">
+          <small>{% trans "SOURCE" %}</small>
+          <strong>{% trans "Private by default" %}</strong>
+          <span>GitHub · Version history</span>
+        </div>
+        <div class="floating-card card-status">
+          <i></i>
+          <div><small>{% trans "PRODUCTION" %}</small><strong>{% trans "All systems ready" %}</strong></div>
+        </div>
+        <div class="floating-card card-preview">
+          <small>{% trans "NEXT STEP" %}</small>
+          <strong>{% trans "Review your preview" %}</strong>
+          <span>{% trans "Nothing goes live without approval." %}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="brand-principles" aria-label="{% trans 'Platform principles' %}">
+      <article><b>01</b><span>{% trans "Business-first planning" %}</span></article>
+      <article><b>02</b><span>{% trans "AI-powered development" %}</span></article>
+      <article><b>03</b><span>{% trans "Human quality control" %}</span></article>
+      <article><b>04</b><span>{% trans "Continuous improvement" %}</span></article>
+    </section>
+
+    <section id="process" class="brand-section process-section">
+      <div class="section-intro">
+        <div class="brand-kicker dark"><span></span>{% trans "FROM REQUIREMENT TO RELEASE" %}</div>
+        <h2>{% trans "A clear process instead of technical chaos." %}</h2>
+        <p>{% trans "You stay in control of decisions. A+ Studio takes care of the technical workflow behind them." %}</p>
+      </div>
+      <div class="process-grid">
+        <article>
+          <span class="process-number">01</span>
+          <div class="process-icon">◎</div>
+          <h3>{% trans "Clarify" %}</h3>
+          <p>{% trans "The AI consultation identifies users, goals, essential features and whether a PWA is the right solution." %}</p>
+        </article>
+        <article>
+          <span class="process-number">02</span>
+          <div class="process-icon">⌘</div>
+          <h3>{% trans "Build" %}</h3>
+          <p>{% trans "Describe changes in normal language. Every approved request becomes a versioned source-code update." %}</p>
+        </article>
+        <article>
+          <span class="process-number">03</span>
+          <div class="process-icon">◇</div>
+          <h3>{% trans "Review" %}</h3>
+          <p>{% trans "Test every version in a protected preview. Production remains untouched until you approve it." %}</p>
+        </article>
+        <article>
+          <span class="process-number">04</span>
+          <div class="process-icon">↗</div>
+          <h3>{% trans "Launch" %}</h3>
+          <p>{% trans "Publish as a PWA immediately or use A+ Solution for App Store and Google Play preparation." %}</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="platform" class="brand-section platform-section">
+      <div class="platform-copy">
+        <div class="brand-kicker"><span></span>{% trans "ONE WORKSPACE FOR THE ENTIRE PRODUCT" %}</div>
+        <h2>{% trans "Not a template builder. A living software project." %}</h2>
+        <p>{% trans "Each customer receives an isolated workspace, source repository, preview environment and deployment history. Your app can keep evolving after launch." %}</p>
+        <ul class="feature-checks">
+          <li>{% trans "Dedicated private source repository" %}</li>
+          <li>{% trans "AI changes with validation and version history" %}</li>
+          <li>{% trans "Managed SSL, hosting and backups" %}</li>
+          <li>{% trans "Custom domains and installable PWA" %}</li>
+          <li>{% trans "Store submission as an optional A+ service" %}</li>
+        </ul>
+      </div>
+      <div class="product-console">
+        <div class="console-top">
+          <div class="console-dots"><i></i><i></i><i></i></div>
+          <span>studio.aplus-solution.de</span>
+          <b>{% trans "Preview protected" %}</b>
+        </div>
+        <div class="console-body">
+          <aside>
+            <div class="console-brand"><span>A+</span><div><strong>Nova Service</strong><small>Version 1.6</small></div></div>
+            <nav>
+              <span class="active">{% trans "AI builder" %}</span>
+              <span>{% trans "App preview" %}</span>
+              <span>{% trans "Deployments" %}</span>
+              <span>{% trans "Settings" %}</span>
+            </nav>
+          </aside>
+          <div class="console-chat">
+            <div class="console-message user">{% trans "Add appointment booking and a customer loyalty area." %}</div>
+            <div class="console-message ai">
+              <span>A+ AI</span>
+              <p>{% trans "The booking flow, customer account and loyalty dashboard are ready in the new preview." %}</p>
+            </div>
+            <div class="console-result">
+              <div><i></i><span>{% trans "Automated checks passed" %}</span></div>
+              <a>{% trans "Open preview" %} ↗</a>
+            </div>
+          </div>
+          <div class="console-phone">
+            <div class="mini-phone">
+              <div class="mini-phone-head">Nova</div>
+              <div class="mini-phone-hero">
+                <small>{% trans "YOUR SERVICE. SIMPLIFIED." %}</small>
+                <strong>{% trans "Everything in one app." %}</strong>
+                <button>{% trans "Book now" %}</button>
+              </div>
+              <div class="mini-phone-grid"><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="service" class="brand-section service-section">
+      <div class="service-panel">
+        <div class="service-logo" role="img" aria-label="A+ Solution GmbH"></div>
+        <div class="service-copy">
+          <div class="brand-kicker"><span></span>{% trans "AI SPEED. A+ RESPONSIBILITY." %}</div>
+          <h2>{% trans "Technology alone is not the product." %}</h2>
+          <p>{% trans "A+ Solution combines AI development with consultation, quality assurance, hosting and store publishing. When a decision needs human judgment, our team is part of the workflow." %}</p>
+        </div>
+        <div class="service-list">
+          <span>{% trans "Product consultation" %}</span>
+          <span>{% trans "Technical quality control" %}</span>
+          <span>{% trans "Managed operation" %}</span>
+          <span>{% trans "App Store support" %}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="brand-cta">
+      <div>
+        <div class="brand-kicker"><span></span>{% trans "START WITH A CONVERSATION" %}</div>
+        <h2>{% trans "Tell us what your business should do better." %}</h2>
+      </div>
+      <div>
+        <p>{% trans "Create your workspace and turn the first requirement into a testable app version." %}</p>
+        <a class="brand-button light" href="{% url 'signup' %}">{% trans "Start building" %}<span>↗</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="brand-footer">
+    <a class="brand-lockup footer-lockup" href="/">
+      <span class="brand-mark" role="img" aria-label="A+ Solution GmbH"></span>
+      <span class="brand-name"><strong>A+ Studio</strong><small>by A+ Solution GmbH</small></span>
+    </a>
+    <div><span>© 2026 A+ Solution GmbH</span><span>{% trans "Built and operated in Germany." %}</span></div>
+  </footer>
+</div>
 {% endblock %}

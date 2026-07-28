@@ -11,16 +11,9 @@ show_diagnostics() {
   echo "Deployment failed with exit code $status near line ${BASH_LINENO[0]:-unknown}."
   if command -v docker >/dev/null 2>&1; then
     cd "$CURRENT_DIR" 2>/dev/null || true
-    echo "--- Docker version ---"
-    docker version || true
-    docker compose version || true
-    echo "--- Compose validation ---"
     docker compose config >/tmp/a-studio-compose-config.log 2>&1 || cat /tmp/a-studio-compose-config.log || true
-    echo "--- Container status ---"
     docker compose ps -a || true
-    echo "--- Recent service logs ---"
     docker compose logs --no-color --tail=120 db redis web worker caddy || true
-    echo "--- Listening ports ---"
     ss -ltnp 2>/dev/null | grep -E ':(22|80|443|8000)\b' || true
   fi
   exit "$status"
@@ -59,25 +52,35 @@ EMAIL_USE_SSL=1
 EMAIL_USE_TLS=0
 EMAIL_HOST_USER=app@aplus-solution.de
 EMAIL_HOST_PASSWORD=
-DEFAULT_FROM_EMAIL=app@aplus-solution.de
-SERVER_EMAIL=app@aplus-solution.de
+DEFAULT_FROM_EMAIL=A+ Studio <app@aplus-solution.de>
+SERVER_EMAIL=A+ Studio <app@aplus-solution.de>
 BILLING_CONTACT_EMAIL=app@aplus-solution.de
 GITHUB_OWNER=hsdarestani
 GITHUB_REPOSITORY_PREFIX=astudio-app-
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+APPLE_OAUTH_CLIENT_ID=
+APPLE_OAUTH_KEY_ID=
+APPLE_OAUTH_TEAM_ID=
+APPLE_OAUTH_PRIVATE_KEY_B64=
 ENV
 fi
 
-python3 - "$ENV_FILE" "${OPENAI_API_KEY_B64:-}" "${EMAIL_PASSWORD_B64:-}" "${GITHUB_TOKEN_B64:-}" <<'PY'
+python3 - "$ENV_FILE" \
+  "${OPENAI_API_KEY_B64:-}" "${EMAIL_PASSWORD_B64:-}" "${GITHUB_TOKEN_B64:-}" \
+  "${GOOGLE_CLIENT_ID_B64:-}" "${GOOGLE_CLIENT_SECRET_B64:-}" \
+  "${APPLE_CLIENT_ID_B64:-}" "${APPLE_KEY_ID_B64:-}" "${APPLE_TEAM_ID_B64:-}" "${APPLE_PRIVATE_KEY_B64:-}" <<'PY'
 import base64
 import pathlib
 import sys
 
 path = pathlib.Path(sys.argv[1])
-encoded = {
-    "OPENAI_API_KEY": sys.argv[2],
-    "EMAIL_HOST_PASSWORD": sys.argv[3],
-    "GITHUB_TOKEN": sys.argv[4],
-}
+keys = [
+    "OPENAI_API_KEY", "EMAIL_HOST_PASSWORD", "GITHUB_TOKEN",
+    "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET",
+    "APPLE_OAUTH_CLIENT_ID", "APPLE_OAUTH_KEY_ID", "APPLE_OAUTH_TEAM_ID", "APPLE_OAUTH_PRIVATE_KEY_B64",
+]
+encoded = dict(zip(keys, sys.argv[2:]))
 defaults = {
     "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
     "EMAIL_HOST": "smtp.strato.de",
@@ -85,9 +88,15 @@ defaults = {
     "EMAIL_USE_SSL": "1",
     "EMAIL_USE_TLS": "0",
     "EMAIL_HOST_USER": "app@aplus-solution.de",
-    "DEFAULT_FROM_EMAIL": "app@aplus-solution.de",
-    "SERVER_EMAIL": "app@aplus-solution.de",
+    "DEFAULT_FROM_EMAIL": "A+ Studio <app@aplus-solution.de>",
+    "SERVER_EMAIL": "A+ Studio <app@aplus-solution.de>",
     "BILLING_CONTACT_EMAIL": "app@aplus-solution.de",
+    "GOOGLE_OAUTH_CLIENT_ID": "",
+    "GOOGLE_OAUTH_CLIENT_SECRET": "",
+    "APPLE_OAUTH_CLIENT_ID": "",
+    "APPLE_OAUTH_KEY_ID": "",
+    "APPLE_OAUTH_TEAM_ID": "",
+    "APPLE_OAUTH_PRIVATE_KEY_B64": "",
 }
 
 lines = path.read_text().splitlines()
@@ -105,7 +114,11 @@ for key, value in defaults.items():
     values.setdefault(key, value)
 for key, value in encoded.items():
     if value:
-        values[key] = base64.b64decode(value).decode()
+        # Keep the Apple .p8 key encoded so the dotenv file stays one-line-safe.
+        if key == "APPLE_OAUTH_PRIVATE_KEY_B64":
+            values[key] = value
+        else:
+            values[key] = base64.b64decode(value).decode()
 
 written = set()
 output = []
@@ -127,7 +140,6 @@ cd "$CURRENT_DIR"
 
 docker compose config >/tmp/a-studio-compose-config.log
 docker compose up -d --build --remove-orphans
-
 docker image prune -f >/dev/null 2>&1 || true
 
 for i in $(seq 1 30); do

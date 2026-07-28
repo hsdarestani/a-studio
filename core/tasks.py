@@ -1,13 +1,18 @@
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.translation import gettext as _
 from .models import CreditTransaction, Deployment, FeatureRequest, Message, Project
 from .services.ai import propose_change
 from .services.generator import generate_preview, publish_project
 from .services.github import sync_project_repository
 from .services.pricing import cost_for_size, estimate_size
 from .services.provisioning import provision_project
-from django.conf import settings
+
+
+def _project_language(project):
+    return project.language if project.language in {"de", "en"} else "de"
 
 
 @shared_task(bind=True)
@@ -25,17 +30,18 @@ def provision_initial_project(self, project_id):
                 project.app_spec = result["spec"]
                 project.save(update_fields=["app_spec", "updated_at"])
         except Exception:
-            # The deterministic generator remains available if the AI provider is temporarily unavailable.
             pass
-        _, checksum = provision_project(project)
+        _root, checksum = provision_project(project)
         deployment.mark_success(project.preview_url, checksum)
+        with translation.override(_project_language(project)):
+            content = _(
+                "Your first PWA is ready. Open the preview and tell me what you would like to change. "
+                "I can update the structure, text, colors, modules, forms, booking experience, products, loyalty and more."
+            )
         Message.objects.create(
             conversation=project.conversation,
             role="assistant",
-            content=(
-                "Your first PWA is ready. Open the preview and tell me what you want to change. "
-                "I can update the structure, copy, colors, modules, forms, booking experience, products, loyalty, and more."
-            ),
+            content=content,
             metadata={"preview_url": project.preview_url, "deployment_id": str(deployment.id)},
         )
         return {"status": "success", "preview_url": project.preview_url}
@@ -86,7 +92,11 @@ def process_chat_message(self, user_message_id, assistant_message_id, user_id):
                 after_spec=after,
             )
             if organization.credits < cost:
-                assistant.content = f"{result['message']}\n\nThis change needs {cost} credit(s), but your workspace has {organization.credits}. Add credits to continue."
+                with translation.override(_project_language(project)):
+                    credit_note = _(
+                        "This change requires %(required)s credit(s), but your workspace currently has %(available)s. Add credits to continue."
+                    ) % {"required": cost, "available": organization.credits}
+                assistant.content = f"{result['message']}\n\n{credit_note}"
                 assistant.status = "done"
                 assistant.metadata = {"action": "payment_required", "credits": cost, "feature_id": str(feature.id)}
                 assistant.save(update_fields=["content", "status", "metadata", "updated_at"])
@@ -132,7 +142,10 @@ def process_chat_message(self, user_message_id, assistant_message_id, user_id):
         assistant.save(update_fields=["content", "status", "metadata", "updated_at"])
         return assistant.metadata
     except Exception as exc:
-        assistant.content = "I could not complete this change safely. The previous version is untouched. The technical team can review the build log."
+        with translation.override(_project_language(project)):
+            assistant.content = _(
+                "I could not complete this change safely. The previous version is untouched. The technical team can review the build log."
+            )
         assistant.status = "failed"
         assistant.metadata = {"error": str(exc)[:1000]}
         assistant.save(update_fields=["content", "status", "metadata", "updated_at"])
@@ -145,15 +158,19 @@ def publish_project_task(self, project_id):
     project = Project.objects.get(pk=project_id)
     deployment = Deployment.objects.create(project=project, environment="production", status="building", version=project.version, url=project.live_url)
     try:
-        _, checksum = publish_project(project)
+        _root, checksum = publish_project(project)
         project.status = "live"
         project.published_at = timezone.now()
         project.save(update_fields=["status", "published_at", "updated_at"])
         deployment.mark_success(project.live_url, checksum)
+        with translation.override(_project_language(project)):
+            content = _(
+                "The approved version is now live. You can keep chatting with me to prepare the next update without affecting production."
+            )
         Message.objects.create(
             conversation=project.conversation,
             role="assistant",
-            content="The approved version is now live. You can keep chatting with me to prepare the next update without affecting production.",
+            content=content,
             metadata={"action": "published", "live_url": project.live_url, "version": project.version},
         )
         return {"status": "success", "live_url": project.live_url}

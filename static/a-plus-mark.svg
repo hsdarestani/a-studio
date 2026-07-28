@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 390" role="img" aria-labelledby="title desc">
+  <title id="title">A+ Solution</title>
+  <desc id="desc">Gold A plus emblem formed by layered triangles.</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff0b7"/>
+      <stop offset=".28" stop-color="#e8bd68"/>
+      <stop offset=".62" stop-color="#b87820"/>
+      <stop offset="1" stop-color="#f4d58d"/>
+    </linearGradient>
+    <linearGradient id="goldStroke" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a86616"/>
+      <stop offset=".48" stop-color="#f4d58d"/>
+      <stop offset="1" stop-color="#d58b24"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <path d="M58 306 218 51l52 82" fill="none" stroke="url(#goldStroke)" stroke-width="3.5"/>
+  <path d="M151 306 311 51l153 255Z" fill="none" stroke="url(#goldStroke)" stroke-width="3.5"/>
+  <path d="M160 342 259 183h71l101 159Z" fill="none" stroke="url(#gold)" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M259 183h71l-35-57Z" fill="url(#gold)"/>
+  <g fill="url(#gold)" filter="url(#glow)">
+    <path d="M224 294c18-40 36-61 57-61 14 0 23 8 27 20-7-8-14-12-23-12-16 0-31 18-46 53h-15Z"/>
+    <path d="M316 252h36v8h-36zM330 238h8v36h-8z"/>
+  </g>
+  <circle cx="126" cy="201" r="3.5" fill="#ffe4a0" filter="url(#glow)"/>
+  <circle cx="340" cy="342" r="3.5" fill="#ffe4a0" filter="url(#glow)"/>
+</svg>
