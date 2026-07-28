@@ -12,7 +12,7 @@
     <a class="back-link" href="{% url 'dashboard' %}">← {% trans "All projects" %}</a>
     <div class="project-identity"><div class="app-avatar large">{{ project.name|slice:':1'|upper }}</div><div><h1>{{ project.name }}</h1><span>{{ project.business_type }}</span></div></div>
     <div class="project-state"><span class="status {{ project.status }}">{% include "partials/project_status.html" %}</span><span>{% trans "Version" %} {{ project.version }}</span></div>
-    <div class="side-block"><small>{% trans "PREVIEW" %}</small><a href="{{ project.preview_url }}" target="_blank" rel="noopener">{% trans "Open preview" %} ↗</a></div>
+    <div class="side-block"><small>{% trans "PREVIEW" %}</small><a href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener">{% trans "Open preview" %} ↗</a></div>
     <div class="side-block"><small>{% trans "PRODUCTION" %}</small>{% if project.status == 'live' %}<a href="{{ project.live_url }}" target="_blank" rel="noopener">{% trans "Open live app" %} ↗</a>{% else %}<span>{% trans "Not published yet" %}</span>{% endif %}</div>
     <div class="side-block"><small>{% trans "DESIRED SUBDOMAIN" %}</small><span>{{ project.desired_domain }}</span><em>{% trans "Requires wildcard DNS to this server." %}</em></div>
     <div class="side-block"><small>{% trans "SOURCE" %}</small>{% if project.repo_url %}<a href="{{ project.repo_url }}" target="_blank" rel="noopener">{% trans "Open private repository" %} ↗</a>{% else %}<span>{% trans "Internal source workspace" %}</span><em>{% trans "Add GitHub runtime credentials to provision customer repositories." %}</em>{% endif %}</div>
@@ -28,7 +28,7 @@
       <article class="chat-message {{ item.role }}" data-message-id="{{ item.id }}">
         <div class="message-author">{% if item.role == 'assistant' %}A+ Builder{% else %}{% trans "You" %}{% endif %}</div>
         <div class="message-content">{{ item.content|linebreaksbr }}</div>
-        {% if item.metadata.preview_url %}<a class="inline-action" href="{{ item.metadata.preview_url }}" target="_blank" rel="noopener">{% trans "Open preview" %} ↗</a>{% endif %}
+        {% if item.metadata.preview_url %}<a class="inline-action" href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener">{% trans "Open preview" %} ↗</a>{% endif %}
         <small>{{ item.created_at|date:'H:i' }}{% if item.status == 'failed' %} · {% trans "failed safely" %}{% endif %}</small>
       </article>
       {% endfor %}
@@ -39,8 +39,8 @@
     </form>
   </section>
   <aside class="preview-panel">
-    <div class="preview-toolbar"><span>{% trans "Interactive preview" %}</span><a href="{{ project.preview_url }}" target="_blank" rel="noopener">{% trans "Open full size" %} ↗</a></div>
-    <div class="device-frame"><div class="device-notch"></div><iframe id="preview-frame" src="{{ project.preview_url }}?v={{ project.version }}" loading="eager" title="{{ project.name }} {% trans "preview" %}"></iframe></div>
+    <div class="preview-toolbar"><span>{% trans "Interactive preview" %}</span><a href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener">{% trans "Open full size" %} ↗</a></div>
+    <div class="device-frame"><div class="device-notch"></div><iframe id="preview-frame" src="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" loading="eager" title="{{ project.name }} {% trans "preview" %}"></iframe></div>
     <section class="deployment-list"><h3>{% trans "Recent deployments" %}</h3>{% for deploy in deployments %}<div><span class="deploy-dot {{ deploy.status }}"></span><b>{% include "partials/deployment_environment.html" %} v{{ deploy.version }}</b><small>{% include "partials/deployment_status.html" %} · {{ deploy.created_at|timesince }} {% trans "ago" %}</small></div>{% empty %}<p>{% trans "No deployments yet." %}</p>{% endfor %}</section>
   </aside>
 </main>

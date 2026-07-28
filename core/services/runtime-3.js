@@ -41,5 +41,21 @@ function bind(){
 }
 window.addEventListener('beforeinstallprompt', event => {event.preventDefault();deferredPrompt=event;document.getElementById('install')?.classList.remove('hidden');});
 render();
-if('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+if('serviceWorker' in navigator){
+  window.addEventListener('load', async () => {
+    const previewMode = location.pathname.includes('/preview/') || new URLSearchParams(location.search).has('preview');
+    if(previewMode){
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.filter(registration => location.href.startsWith(registration.scope)).map(registration => registration.unregister()));
+      if('caches' in window){
+        const prefix = String(window.APP_CACHE_PREFIX || '');
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(key => prefix && key.startsWith(prefix)).map(key => caches.delete(key)));
+      }
+      return;
+    }
+    const version = encodeURIComponent(String(window.APP_BUILD_VERSION || '1'));
+    navigator.serviceWorker.register(`sw.js?v=${version}`);
+  });
+}
 })();

@@ -27,11 +27,20 @@ def _icon_svg(primary, accent):
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{_safe(primary)}"/><stop offset="1" stop-color="{_safe(accent)}"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/><path d="M154 342 256 142l102 200h-58l-17-38h-55l25-52h8l-5-12-52 102z" fill="white"/></svg>'''
 
 
-def _index_html(spec):
+def _index_html(spec, version, slug):
     app, brand = spec["app"], spec["brand"]
     title = _safe(app.get("title"))
     direction = "rtl" if app.get("direction") == "rtl" else "ltr"
     language = _safe(app.get("language", "de"))
+    version = str(version)
+    cache_prefix = f"astudio-{slug}-"
+    runtime_config = (
+        "window.APP_BUILD_VERSION = "
+        + json.dumps(version)
+        + "; window.APP_CACHE_PREFIX = "
+        + json.dumps(cache_prefix)
+        + ";"
+    )
     return f'''<!doctype html>
 <html lang="{language}" dir="{direction}">
 <head>
@@ -39,17 +48,18 @@ def _index_html(spec):
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="{_safe(brand.get('primary'))}">
   <meta name="description" content="{_safe(app.get('tagline'))}">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.webmanifest?v={version}">
+  <link rel="icon" href="icon.svg?v={version}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg?v={version}">
+  <link rel="stylesheet" href="styles.css?v={version}">
   <title>{title}</title>
 </head>
 <body>
   <div id="app" class="app-shell" aria-live="polite"></div>
   <noscript>This app needs JavaScript enabled.</noscript>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script>{runtime_config}</script>
+  <script src="config.js?v={version}"></script>
+  <script src="app.js?v={version}"></script>
 </body>
 </html>'''
 
@@ -80,13 +90,40 @@ def _app_js():
     )
 
 
+def _service_worker(project):
+    version = str(project.version)
+    prefix = f"astudio-{project.slug}-"
+    cache_name = f"{prefix}v{version}"
+    assets = [
+        "./",
+        "index.html",
+        f"styles.css?v={version}",
+        f"app.js?v={version}",
+        f"config.js?v={version}",
+        f"manifest.webmanifest?v={version}",
+        f"icon.svg?v={version}",
+    ]
+    return (
+        "const P="
+        + json.dumps(prefix)
+        + ";const C="
+        + json.dumps(cache_name)
+        + ";const A="
+        + json.dumps(assets)
+        + ";"
+        "self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(A))));"
+        "self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.startsWith(P)&&x!==C).map(x=>caches.delete(x))))));"
+        "self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('index.html'))));});"
+    )
+
+
 def generate_preview(project):
     spec = sanitize_spec(project.app_spec)
     root = Path(settings.APP_DATA_ROOT) / "preview" / project.slug
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True, exist_ok=True)
-    _write(root / "index.html", _index_html(spec))
+    _write(root / "index.html", _index_html(spec, project.version, project.slug))
     _write(root / "styles.css", _styles(spec))
     _write(root / "app.js", _app_js())
     _write(
@@ -121,12 +158,7 @@ def generate_preview(project):
         root / "manifest.webmanifest",
         json.dumps(manifest, ensure_ascii=False, indent=2),
     )
-    _write(
-        root / "sw.js",
-        "const C='astudio-v"
-        + str(project.version)
-        + "';const A=['./','index.html','styles.css','app.js','config.js','manifest.webmanifest','icon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(A))));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x))))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('index.html')))));",
-    )
+    _write(root / "sw.js", _service_worker(project))
     checksum = hashlib.sha256(
         "".join(
             path.read_text(encoding="utf-8")
