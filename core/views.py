@@ -8,6 +8,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET, require_POST
 from .forms import ProjectCreateForm, SignUpForm
 from .models import Conversation, CreditTransaction, Membership, Message, Organization, Project, StoreSubmission
@@ -18,7 +19,11 @@ from .tasks import process_chat_message, provision_initial_project, publish_proj
 def _organization_for(user):
     membership = Membership.objects.select_related("organization").filter(user=user, organization__active=True).first()
     if not membership:
-        organization = Organization.objects.create(name=f"{user.get_full_name() or user.username}'s workspace", owner=user, billing_email=user.email)
+        organization = Organization.objects.create(
+            name=_('%(name)s workspace') % {"name": user.get_full_name() or user.username},
+            owner=user,
+            billing_email=user.email,
+        )
         Membership.objects.create(organization=organization, user=user, role="owner")
         return organization
     return membership.organization
@@ -47,7 +52,13 @@ def signup(request):
             credits=20,
         )
         Membership.objects.create(organization=organization, user=user, role="owner")
-        CreditTransaction.objects.create(organization=organization, kind="grant", amount=20, balance_after=20, description="Welcome credits")
+        CreditTransaction.objects.create(
+            organization=organization,
+            kind="grant",
+            amount=20,
+            balance_after=20,
+            description=_("Welcome credits"),
+        )
         login(request, user)
         return redirect("project_create")
     return render(request, "registration/signup.html", {"form": form})
@@ -63,7 +74,7 @@ def dashboard(request):
 @login_required
 def project_create(request):
     organization = _organization_for(request.user)
-    form = ProjectCreateForm(request.POST or None)
+    form = ProjectCreateForm(request.POST or None, initial={"language": request.LANGUAGE_CODE if request.LANGUAGE_CODE in {"de", "en"} else "de"})
     if request.method == "POST" and form.is_valid():
         project = form.save(commit=False)
         project.organization = organization
@@ -71,7 +82,7 @@ def project_create(request):
         project.save()
         Conversation.objects.create(project=project)
         provision_initial_project.delay(str(project.id))
-        messages.success(request, "Your project is being provisioned. The first preview will appear in the conversation.")
+        messages.success(request, _("Your project is being prepared. The first preview will appear in the conversation."))
         return redirect("project_detail", pk=project.id)
     return render(request, "project_create.html", {"form": form, "organization": organization})
 
@@ -79,7 +90,7 @@ def project_create(request):
 @login_required
 def project_detail(request, pk):
     project = _project_for(request.user, pk)
-    conversation, _ = Conversation.objects.get_or_create(project=project)
+    conversation, _created = Conversation.objects.get_or_create(project=project)
     chat_messages = conversation.messages.order_by("created_at")
     return render(request, "project_detail.html", {
         "project": project,
@@ -96,12 +107,12 @@ def chat_submit(request, pk):
     project = _project_for(request.user, pk)
     body = request.POST.get("message", "").strip()
     if not body:
-        return JsonResponse({"error": "Message is required"}, status=400)
+        return JsonResponse({"error": _("A message is required.")}, status=400)
     if len(body) > 12000:
-        return JsonResponse({"error": "Message is too long"}, status=400)
-    conversation, _ = Conversation.objects.get_or_create(project=project)
+        return JsonResponse({"error": _("The message is too long.")}, status=400)
+    conversation, _created = Conversation.objects.get_or_create(project=project)
     user_message = Message.objects.create(conversation=conversation, role="user", content=body)
-    assistant = Message.objects.create(conversation=conversation, role="assistant", content="Working on your request…", status="queued")
+    assistant = Message.objects.create(conversation=conversation, role="assistant", content=_("Working on your request…"), status="queued")
     task = process_chat_message.delay(str(user_message.id), str(assistant.id), request.user.id)
     assistant.task_id = task.id
     assistant.save(update_fields=["task_id", "updated_at"])
@@ -130,10 +141,10 @@ def message_status(request, pk, message_id):
 def publish_project(request, pk):
     project = _project_for(request.user, pk)
     if project.status not in {"preview", "live"}:
-        messages.error(request, "A successful preview build is required before publishing.")
+        messages.error(request, _("A successful preview build is required before publishing."))
         return redirect("project_detail", pk=project.pk)
     publish_project_task.delay(str(project.id))
-    messages.success(request, "Publishing started. Production stays untouched until the approved files are copied successfully.")
+    messages.success(request, _("Publishing has started. Production remains untouched until the approved files are copied successfully."))
     return redirect("project_detail", pk=project.pk)
 
 
@@ -145,7 +156,9 @@ def request_store_submission(request, pk):
     if platform not in {"android", "ios", "both"}:
         platform = "both"
     submission = StoreSubmission.objects.create(
-        project=project, requested_by=request.user, platform=platform,
+        project=project,
+        requested_by=request.user,
+        platform=platform,
         notes=request.POST.get("notes", "")[:4000],
         eligibility_report={
             "has_pwa": project.status in {"preview", "live"},
@@ -154,7 +167,11 @@ def request_store_submission(request, pk):
             "manual_a_plus_review": True,
         },
     )
-    messages.success(request, f"Store publishing request created for {submission.get_platform_display()}. A+ will review eligibility and developer account requirements.")
+    messages.success(
+        request,
+        _("A store publishing request was created for %(platform)s. A+ Solution will review eligibility and developer-account requirements.")
+        % {"platform": submission.get_platform_display()},
+    )
     return redirect("project_detail", pk=project.pk)
 
 

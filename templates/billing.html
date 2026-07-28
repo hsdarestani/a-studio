@@ -1,21 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}Plans — A+ Studio{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Plans" %} — A+ Studio{% endblock %}
 {% block content %}
 <main class="dashboard-shell">
-  <section class="dashboard-head"><div><div class="eyebrow dark">PLANS & FEATURE CREDITS</div><h1>Scale the way you build.</h1><p>Payments are handled offline for now. Choose the suitable plan and contact A+ to activate it for your workspace.</p></div><div class="credit-chip"><span>Current credits</span><b>{{ organization.credits }}</b></div></section>
+  <section class="dashboard-head"><div><div class="eyebrow dark">{% trans "PLANS & FEATURE CREDITS" %}</div><h1>{% trans "Scale the way you build." %}</h1><p>{% trans "Payments are handled offline for now. Choose the suitable plan and contact A+ Solution to activate it for your workspace." %}</p></div><div class="credit-chip"><span>{% trans "Current credits" %}</span><b>{{ organization.credits }}</b></div></section>
   <section class="pricing-grid">
     {% for key, plan in plans.items %}
     <article class="pricing-card {% if organization.plan == key %}featured{% endif %}">
-      <div><span class="pill">{% if organization.plan == key %}Current plan{% else %}{{ plan.projects }} project{{ plan.projects|pluralize }}{% endif %}</span><h2>{{ plan.name }}</h2><div class="price-line"><b>€{{ plan.monthly }}</b><span>/month</span></div><p>{{ plan.credits }} feature credits per month, managed hosting, SSL, backups, version history, and preview deployments.</p></div>
+      <div><span class="pill">{% if organization.plan == key %}{% trans "Current plan" %}{% else %}{{ plan.projects }} {% trans "projects" %}{% endif %}</span><h2>{{ plan.name }}</h2><div class="price-line"><b>€{{ plan.monthly }}</b><span>{% trans "/month" %}</span></div><p>{{ plan.credits }} {% trans "feature credits per month, managed hosting, SSL, backups, version history and preview deployments." %}</p></div>
       {% if organization.plan == key %}
-      <button class="button full" disabled>Active</button>
+      <button class="button full" disabled>{% trans "Active" %}</button>
       {% else %}
-      <a class="button full" href="mailto:{{ billing_contact_email }}?subject=A%2B%20Studio%20{{ plan.name|urlencode }}%20activation&body=Workspace%3A%20{{ organization.name|urlencode }}%0ARequested%20plan%3A%20{{ plan.name|urlencode }}">Request offline activation</a>
+      <a class="button full" href="mailto:{{ billing_contact_email }}?subject=A%2B%20Studio%20{{ plan.name|urlencode }}%20activation&body=Workspace%3A%20{{ organization.name|urlencode }}%0ARequested%20plan%3A%20{{ plan.name|urlencode }}">{% trans "Request offline activation" %}</a>
       {% endif %}
     </article>
     {% endfor %}
   </section>
-  <section class="billing-note"><h2>Offline billing</h2><p>Plan activation, invoices, bank transfer and additional feature-credit purchases are currently coordinated through <a href="mailto:{{ billing_contact_email }}">{{ billing_contact_email }}</a>. No card data or online payment credentials are stored in A+ Studio.</p></section>
-  <section class="billing-note"><h2>Store publishing is separate.</h2><p>A+ reviews store eligibility, prepares native packages, metadata, screenshots, privacy declarations, testing tracks, and submission under the customer's own developer accounts.</p></section>
+  <section class="billing-note"><h2>{% trans "Offline billing" %}</h2><p>{% trans "Plan activation, invoices, bank transfer and additional feature-credit purchases are currently coordinated through" %} <a href="mailto:{{ billing_contact_email }}">{{ billing_contact_email }}</a>. {% trans "No card data or online payment credentials are stored in A+ Studio." %}</p></section>
+  <section class="billing-note"><h2>{% trans "Store publishing is separate." %}</h2><p>{% trans "A+ Solution reviews store eligibility, prepares native packages, metadata, screenshots, privacy declarations, testing tracks and submission under the customer's own developer accounts." %}</p></section>
 </main>
 {% endblock %}

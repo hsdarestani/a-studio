@@ -1,22 +1,29 @@
-{% load static %}
+{% load static i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ CURRENT_LANGUAGE|default:'de' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101114">
+  <meta name="theme-color" content="#071426">
+  <meta name="description" content="{% block meta_description %}{% trans 'A+ Studio — AI-powered app development by A+ Solution GmbH.' %}{% endblock %}">
   <title>{% block title %}A+ Studio{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'app.css' %}">
+  <link rel="stylesheet" href="{% static 'brand.css' %}">
   <script defer src="{% static 'app.js' %}"></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% if user.is_authenticated %}
   <header class="site-header">
-    <a class="logo" href="{% url 'dashboard' %}"><span>A+</span> Studio</a>
+    <a class="app-brand" href="{% url 'dashboard' %}">
+      <span class="app-brand-mark">A+</span>
+      <span><strong>A+ Studio</strong><small>A+ Solution GmbH</small></span>
+    </a>
     <nav class="header-nav">
-      <a href="{% url 'dashboard' %}">Projects</a>
-      <a href="{% url 'billing' %}">Billing</a>
-      <form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="link-button">Log out</button></form>
+      <a href="{% url 'dashboard' %}">{% trans "Projects" %}</a>
+      <a href="{% url 'billing' %}">{% trans "Plans" %}</a>
+      {% include "partials/language_switcher.html" %}
+      <form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="link-button">{% trans "Log out" %}</button></form>
     </nav>
   </header>
   {% endif %}

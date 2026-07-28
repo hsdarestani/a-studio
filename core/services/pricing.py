@@ -1,11 +1,12 @@
 from copy import deepcopy
+from django.utils.translation import gettext_lazy as _
 
 CREDIT_COSTS = {"micro": 0, "small": 1, "standard": 3, "advanced": 7, "custom": 12}
 
 PLANS = {
-    "starter": {"name": "Starter", "monthly": 49, "credits": 3, "projects": 1},
-    "business": {"name": "Business", "monthly": 149, "credits": 12, "projects": 5},
-    "pro": {"name": "Pro", "monthly": 399, "credits": 40, "projects": 25},
+    "starter": {"name": _("Starter"), "monthly": 49, "credits": 3, "projects": 1},
+    "business": {"name": _("Business"), "monthly": 149, "credits": 12, "projects": 5},
+    "pro": {"name": _("Pro"), "monthly": 399, "credits": 40, "projects": 25},
 }
 
 

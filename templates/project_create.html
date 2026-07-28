@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}New app — A+ Studio{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "New app" %} — A+ Studio{% endblock %}
 {% block content %}
 <main class="narrow-shell">
-  <a class="back-link" href="{% url 'dashboard' %}">← Back to projects</a>
+  <a class="back-link" href="{% url 'dashboard' %}">← {% trans "Back to projects" %}</a>
   <section class="create-card">
-    <div class="eyebrow dark">NEW AI APP PROJECT</div><h1>What should we build?</h1><p>Give us the business context and desired outcome. The first version is generated automatically; you can refine everything through chat.</p>
+    <div class="eyebrow dark">{% trans "NEW AI APP PROJECT" %}</div><h1>{% trans "What should we build?" %}</h1><p>{% trans "Give us the business context and desired outcome. The first version is generated automatically; you can refine everything through chat." %}</p>
     <form method="post" class="form-stack large-form">{% csrf_token %}{{ form.as_p }}
-      <div class="form-note"><b>What happens next?</b><span>Private workspace → PWA generation → automated checks → safe preview</span></div>
-      <button class="button full">Create project and first preview</button>
+      <div class="form-note"><b>{% trans "What happens next?" %}</b><span>{% trans "Private workspace → PWA generation → automated checks → safe preview" %}</span></div>
+      <button class="button full">{% trans "Create project and first preview" %}</button>
     </form>
   </section>
 </main>

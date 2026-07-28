@@ -1,0 +1,639 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: A+ Studio\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "%(name)s workspace"
+msgstr "Workspace von %(name)s"
+
+msgid "/month"
+msgstr "/Monat"
+
+msgid "20 welcome credits"
+msgstr "20 Startguthaben-Credits"
+
+msgid "A clear process instead of technical chaos."
+msgstr "Ein klarer Prozess statt technischem Chaos."
+
+msgid "A message is required."
+msgstr "Eine Nachricht ist erforderlich."
+
+msgid "A store publishing request was created for %(platform)s. A+ Solution will review eligibility and developer-account requirements."
+msgstr "Für %(platform)s wurde eine Anfrage zur Store-Veröffentlichung erstellt. A+ Solution prüft die Eignung und die Anforderungen an die Entwicklerkonten."
+
+msgid "A successful preview build is required before publishing."
+msgstr "Vor der Veröffentlichung ist ein erfolgreicher Vorschau-Build erforderlich."
+
+msgid "A+ Solution combines AI development with consultation, quality assurance, hosting and store publishing. When a decision needs human judgment, our team is part of the workflow."
+msgstr "A+ Solution verbindet KI-Entwicklung mit Beratung, Qualitätssicherung, Hosting und Store-Veröffentlichung. Sobald eine Entscheidung menschliches Urteilsvermögen erfordert, ist unser Team Teil des Workflows."
+
+msgid "A+ Solution reviews store eligibility, prepares native packages, metadata, screenshots, privacy declarations, testing tracks and submission under the customer's own developer accounts."
+msgstr "A+ Solution prüft die Store-Eignung und erstellt native Pakete, Metadaten, Screenshots, Datenschutzerklärungen, Test-Tracks sowie die Einreichung über die eigenen Entwicklerkonten des Kunden."
+
+msgid "A+ Studio product preview"
+msgstr "A+ Studio Produktvorschau"
+
+msgid "A+ Studio turns business ideas into production-ready apps with AI development, private source code, managed hosting and human support."
+msgstr "A+ Studio verwandelt Geschäftsideen in produktionsreife Apps – mit KI-Entwicklung, privatem Quellcode, Managed Hosting und persönlichem Support."
+
+msgid "A+ Studio — AI-powered app development by A+ Solution GmbH."
+msgstr "A+ Studio – KI-gestützte App-Entwicklung von A+ Solution GmbH."
+
+msgid "A+ human support"
+msgstr "Persönlicher A+ Support"
+
+msgid "A+ service"
+msgstr "A+ Service"
+
+msgid "AI APP DEVELOPMENT · MADE IN GERMANY"
+msgstr "KI-APP-ENTWICKLUNG · MADE IN GERMANY"
+
+msgid "AI SPEED. A+ RESPONSIBILITY."
+msgstr "KI-GESCHWINDIGKEIT. A+ VERANTWORTUNG."
+
+msgid "AI app development for businesses"
+msgstr "KI-App-Entwicklung für Unternehmen"
+
+msgid "AI builder"
+msgstr "KI-Builder"
+
+msgid "AI can make mistakes. Every change is isolated and previewed first."
+msgstr "KI kann Fehler machen. Jede Änderung wird isoliert und zuerst in einer Vorschau geprüft."
+
+msgid "AI changes with validation and version history"
+msgstr "KI-Änderungen mit Validierung und Versionsverlauf"
+
+msgid "AI-powered development"
+msgstr "KI-gestützte Entwicklung"
+
+msgid "Active"
+msgstr "Aktiv"
+
+msgid "Add GitHub runtime credentials to provision customer repositories."
+msgstr "GitHub-Zugangsdaten hinzufügen, um Kunden-Repositories automatisch bereitzustellen."
+
+msgid "Add appointment booking and a customer loyalty area."
+msgstr "Füge eine Terminbuchung und einen Kundenbereich mit Treueprogramm hinzu."
+
+msgid "All projects"
+msgstr "Alle Projekte"
+
+msgid "All systems ready"
+msgstr "Alle Systeme bereit"
+
+msgid "Already registered?"
+msgstr "Bereits registriert?"
+
+msgid "An account with this email already exists."
+msgstr "Für diese E-Mail-Adresse besteht bereits ein Konto."
+
+msgid "Android only"
+msgstr "Nur Android"
+
+msgid "App Store support"
+msgstr "App-Store-Support"
+
+msgid "App language"
+msgstr "Sprache der App"
+
+msgid "App name"
+msgstr "App-Name"
+
+msgid "App preview"
+msgstr "App-Vorschau"
+
+msgid "Apple login will be available soon"
+msgstr "Apple-Anmeldung wird nach Einrichtung verfügbar"
+
+msgid "Apple signup will be available soon"
+msgstr "Apple-Registrierung wird nach Einrichtung verfügbar"
+
+msgid "Ask for pages, booking flows, product cards, loyalty, forms, multilingual content, visual changes or a complete restructuring. Production remains untouched until you publish."
+msgstr "Fordern Sie Seiten, Buchungsabläufe, Produktkarten, Loyalty-Funktionen, Formulare, mehrsprachige Inhalte, visuelle Änderungen oder eine vollständige Neustrukturierung an. Die Produktion bleibt unverändert, bis Sie veröffentlichen."
+
+msgid "Automated checks passed"
+msgstr "Automatisierte Prüfungen bestanden"
+
+msgid "Back to projects"
+msgstr "Zurück zu den Projekten"
+
+msgid "Book now"
+msgstr "Jetzt buchen"
+
+msgid "Build"
+msgstr "Entwickeln"
+
+msgid "Build change"
+msgstr "Änderung erstellen"
+
+msgid "Build your first version"
+msgstr "Erste Version entwickeln"
+
+msgid "Build, preview, publish and improve every app from one workspace."
+msgstr "Entwickeln, prüfen, veröffentlichen und verbessern Sie jede App in einem zentralen Workspace."
+
+msgid "Building"
+msgstr "Wird erstellt"
+
+msgid "Built and operated in Germany."
+msgstr "Entwickelt und betrieben in Deutschland."
+
+msgid "Built intelligently."
+msgstr "Intelligent entwickelt."
+
+msgid "Business"
+msgstr "Business"
+
+msgid "Business context and desired outcome"
+msgstr "Geschäftlicher Kontext und gewünschtes Ergebnis"
+
+msgid "Business email"
+msgstr "Geschäftliche E-Mail-Adresse"
+
+msgid "Business type"
+msgstr "Branche / Geschäftsmodell"
+
+msgid "Business-first planning"
+msgstr "Business-first Planung"
+
+msgid "CREATE YOUR WORKSPACE"
+msgstr "WORKSPACE ERSTELLEN"
+
+msgid "Changes are built in preview first"
+msgstr "Änderungen werden zuerst in der Vorschau erstellt"
+
+msgid "Choose a provider or use your email and password."
+msgstr "Wählen Sie einen Anbieter oder verwenden Sie E-Mail und Passwort."
+
+msgid "Clarify"
+msgstr "Klären"
+
+msgid "Company name"
+msgstr "Unternehmensname"
+
+msgid "Continue where your product left off."
+msgstr "Machen Sie dort weiter, wo Ihr Produkt aufgehört hat."
+
+msgid "Continue with Apple"
+msgstr "Mit Apple fortfahren"
+
+msgid "Continue with Google"
+msgstr "Mit Google fortfahren"
+
+msgid "Continuous improvement"
+msgstr "Kontinuierliche Weiterentwicklung"
+
+msgid "Create an account"
+msgstr "Konto erstellen"
+
+msgid "Create project and first preview"
+msgstr "Projekt und erste Vorschau erstellen"
+
+msgid "Create workspace"
+msgstr "Workspace erstellen"
+
+msgid "Create your first app"
+msgstr "Erste App erstellen"
+
+msgid "Create your workspace and turn the first requirement into a testable app version."
+msgstr "Erstellen Sie Ihren Workspace und verwandeln Sie die erste Anforderung in eine testbare App-Version."
+
+msgid "Credits"
+msgstr "Credits"
+
+msgid "Current credits"
+msgstr "Aktuelle Credits"
+
+msgid "Current plan"
+msgstr "Aktueller Tarif"
+
+msgid "Custom domains and installable PWA"
+msgstr "Eigene Domains und installierbare PWA"
+
+msgid "DESIRED SUBDOMAIN"
+msgstr "GEWÜNSCHTE SUBDOMAIN"
+
+msgid "Dedicated private source repository"
+msgstr "Eigenes privates Quellcode-Repository"
+
+msgid "Deployments"
+msgstr "Deployments"
+
+msgid "Describe changes in normal language. Every approved request becomes a versioned source-code update."
+msgstr "Beschreiben Sie Änderungen in normaler Sprache. Jede freigegebene Anforderung wird zu einem versionierten Quellcode-Update."
+
+msgid "Describe the business, target users and what the app should do."
+msgstr "Beschreiben Sie das Unternehmen, die Zielgruppe und was die App leisten soll."
+
+msgid "Describe the feature or change you want…"
+msgstr "Beschreiben Sie das gewünschte Feature oder die Änderung…"
+
+msgid "Describe what your business needs. A+ Studio plans, develops and improves your app through a guided AI workflow—with private source code, safe previews and real human support from A+ Solution."
+msgstr "Beschreiben Sie, was Ihr Unternehmen benötigt. A+ Studio plant, entwickelt und verbessert Ihre App in einem geführten KI-Workflow – mit privatem Quellcode, sicheren Vorschauen und persönlichem Support von A+ Solution."
+
+msgid "Describe your business and A+ Studio will provision the project, design the initial PWA and give you a protected preview."
+msgstr "Beschreiben Sie Ihr Unternehmen. A+ Studio richtet das Projekt ein, entwickelt die erste PWA und stellt eine geschützte Vorschau bereit."
+
+msgid "Download PWA"
+msgstr "PWA herunterladen"
+
+msgid "Draft"
+msgstr "Entwurf"
+
+msgid "Each customer receives an isolated workspace, source repository, preview environment and deployment history. Your app can keep evolving after launch."
+msgstr "Jeder Kunde erhält einen isolierten Workspace, ein eigenes Quellcode-Repository, eine Vorschauumgebung und einen Deployment-Verlauf. Ihre App kann sich auch nach dem Launch kontinuierlich weiterentwickeln."
+
+msgid "Email address"
+msgstr "E-Mail-Adresse"
+
+msgid "Error"
+msgstr "Fehler"
+
+msgid "Everything in one app."
+msgstr "Alles in einer App."
+
+msgid "Export app specification"
+msgstr "App-Spezifikation exportieren"
+
+msgid "FROM IDEA TO FIRST PREVIEW"
+msgstr "VON DER IDEE ZUR ERSTEN VORSCHAU"
+
+msgid "FROM REQUIREMENT TO RELEASE"
+msgstr "VON DER ANFORDERUNG ZUM RELEASE"
+
+msgid "Failed"
+msgstr "Fehlgeschlagen"
+
+msgid "Feature credits"
+msgstr "Feature-Credits"
+
+msgid "Full name"
+msgstr "Vollständiger Name"
+
+msgid "German-first interface"
+msgstr "Deutsch als Standardsprache"
+
+msgid "Give us the business context and desired outcome. The first version is generated automatically; you can refine everything through chat."
+msgstr "Beschreiben Sie den geschäftlichen Kontext und das gewünschte Ergebnis. Die erste Version wird automatisch erstellt und kann anschließend vollständig per Chat verfeinert werden."
+
+msgid "Google login will be available soon"
+msgstr "Google-Anmeldung wird nach Einrichtung verfügbar"
+
+msgid "Google signup will be available soon"
+msgstr "Google-Registrierung wird nach Einrichtung verfügbar"
+
+msgid "Hosting in Europe"
+msgstr "Hosting in Europa"
+
+msgid "How it works"
+msgstr "So funktioniert es"
+
+msgid "Human quality control"
+msgstr "Menschliche Qualitätskontrolle"
+
+msgid "I could not complete this change safely. The previous version is untouched. The technical team can review the build log."
+msgstr "Diese Änderung konnte nicht sicher abgeschlossen werden. Die vorherige Version bleibt unverändert. Das technische Team kann das Build-Protokoll prüfen."
+
+msgid "Interactive preview"
+msgstr "Interaktive Vorschau"
+
+msgid "Internal source workspace"
+msgstr "Interner Quellcode-Workspace"
+
+msgid "Launch"
+msgstr "Veröffentlichen"
+
+msgid "Live"
+msgstr "Live"
+
+msgid "Log in"
+msgstr "Anmelden"
+
+msgid "Log in to A+ Studio"
+msgstr "Bei A+ Studio anmelden"
+
+msgid "Log out"
+msgstr "Abmelden"
+
+msgid "Main navigation"
+msgstr "Hauptnavigation"
+
+msgid "Managed SSL, hosting and backups"
+msgstr "Managed SSL, Hosting und Backups"
+
+msgid "Managed operation"
+msgstr "Managed Betrieb"
+
+msgid "Managed professionally."
+msgstr "Professionell betreut."
+
+msgid "NEW AI APP PROJECT"
+msgstr "NEUES KI-APP-PROJEKT"
+
+msgid "NEXT STEP"
+msgstr "NÄCHSTER SCHRITT"
+
+msgid "New app"
+msgstr "Neue App"
+
+msgid "New to A+ Studio?"
+msgstr "Neu bei A+ Studio?"
+
+msgid "No card data or online payment credentials are stored in A+ Studio."
+msgstr "A+ Studio speichert keine Kartendaten oder Zugangsdaten für Online-Zahlungen."
+
+msgid "No card required"
+msgstr "Keine Kreditkarte erforderlich"
+
+msgid "No deployments yet."
+msgstr "Noch keine Deployments."
+
+msgid "Not a template builder. A living software project."
+msgstr "Kein Template-Builder. Ein lebendiges Softwareprojekt."
+
+msgid "Not published yet"
+msgstr "Noch nicht veröffentlicht"
+
+msgid "Nothing goes live without approval."
+msgstr "Ohne Freigabe geht nichts live."
+
+msgid "ONE WORKSPACE FOR THE ENTIRE PRODUCT"
+msgstr "EIN WORKSPACE FÜR DAS GESAMTE PRODUKT"
+
+msgid "Offline billing"
+msgstr "Offline-Abrechnung"
+
+msgid "Open builder"
+msgstr "Builder öffnen"
+
+msgid "Open full size"
+msgstr "In voller Größe öffnen"
+
+msgid "Open live app"
+msgstr "Live-App öffnen"
+
+msgid "Open preview"
+msgstr "Vorschau öffnen"
+
+msgid "Open private repository"
+msgstr "Privates Repository öffnen"
+
+msgid "PLANS & FEATURE CREDITS"
+msgstr "TARIFE & FEATURE-CREDITS"
+
+msgid "PREVIEW"
+msgstr "VORSCHAU"
+
+msgid "PRODUCTION"
+msgstr "PRODUKTION"
+
+msgid "Password"
+msgstr "Passwort"
+
+msgid "Paused"
+msgstr "Pausiert"
+
+msgid "Payments are handled offline for now. Choose the suitable plan and contact A+ Solution to activate it for your workspace."
+msgstr "Zahlungen werden derzeit offline abgewickelt. Wählen Sie den passenden Tarif und kontaktieren Sie A+ Solution zur Aktivierung in Ihrem Workspace."
+
+msgid "Plan activation, invoices, bank transfer and additional feature-credit purchases are currently coordinated through"
+msgstr "Tarifaktivierung, Rechnungen, Banküberweisung und zusätzliche Feature-Credits werden derzeit koordiniert über"
+
+msgid "Plans"
+msgstr "Tarife"
+
+msgid "Platform"
+msgstr "Plattform"
+
+msgid "Platform principles"
+msgstr "Plattformprinzipien"
+
+msgid "Preview"
+msgstr "Vorschau"
+
+msgid "Preview before publishing"
+msgstr "Vorschau vor Veröffentlichung"
+
+msgid "Preview protected"
+msgstr "Vorschau geschützt"
+
+msgid "Preview ready"
+msgstr "Vorschau bereit"
+
+msgid "Private by default"
+msgstr "Standardmäßig privat"
+
+msgid "Private repositories"
+msgstr "Private Repositories"
+
+msgid "Private source code"
+msgstr "Privater Quellcode"
+
+msgid "Private workspace → PWA generation → automated checks → safe preview"
+msgstr "Privater Workspace → PWA-Erstellung → automatisierte Prüfungen → sichere Vorschau"
+
+msgid "Pro"
+msgstr "Pro"
+
+msgid "Product consultation"
+msgstr "Produktberatung"
+
+msgid "Production"
+msgstr "Produktion"
+
+msgid "Projects"
+msgstr "Projekte"
+
+msgid "Publish approved preview"
+msgstr "Freigegebene Vorschau veröffentlichen"
+
+msgid "Publish as a PWA immediately or use A+ Solution for App Store and Google Play preparation."
+msgstr "Veröffentlichen Sie sofort als PWA oder nutzen Sie A+ Solution für die Vorbereitung auf App Store und Google Play."
+
+msgid "Publishing has started. Production remains untouched until the approved files are copied successfully."
+msgstr "Die Veröffentlichung wurde gestartet. Die Produktion bleibt unverändert, bis die freigegebenen Dateien erfolgreich übernommen wurden."
+
+msgid "Queued"
+msgstr "In Warteschlange"
+
+msgid "Recent deployments"
+msgstr "Letzte Deployments"
+
+msgid "Request offline activation"
+msgstr "Offline-Aktivierung anfragen"
+
+msgid "Request store publishing"
+msgstr "Store-Veröffentlichung anfragen"
+
+msgid "Requires wildcard DNS to this server."
+msgstr "Erfordert einen Wildcard-DNS-Eintrag auf diesen Server."
+
+msgid "Review"
+msgstr "Prüfen"
+
+msgid "Review previews, request the next feature and publish approved versions from one secure workspace."
+msgstr "Prüfen Sie Vorschauen, beauftragen Sie das nächste Feature und veröffentlichen Sie freigegebene Versionen aus einem sicheren Workspace."
+
+msgid "Review your preview"
+msgstr "Vorschau prüfen"
+
+msgid "Rolled back"
+msgstr "Zurückgesetzt"
+
+msgid "SOURCE"
+msgstr "QUELLCODE"
+
+msgid "START WITH A CONVERSATION"
+msgstr "MIT EINEM GESPRÄCH STARTEN"
+
+msgid "Safe preview workflow"
+msgstr "Sicherer Vorschau-Workflow"
+
+msgid "Scale the way you build."
+msgstr "Skalieren Sie Ihre Entwicklung passend zum Bedarf."
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Sign up with Apple"
+msgstr "Mit Apple registrieren"
+
+msgid "Sign up with Google"
+msgstr "Mit Google registrieren"
+
+msgid "Sign up with a provider or create an account using email."
+msgstr "Registrieren Sie sich über einen Anbieter oder erstellen Sie ein Konto mit Ihrer E-Mail-Adresse."
+
+msgid "Start a project"
+msgstr "Projekt starten"
+
+msgid "Start building"
+msgstr "Entwicklung starten"
+
+msgid "Start with the business need, not the technical specification."
+msgstr "Beginnen Sie mit dem geschäftlichen Bedarf – nicht mit einer technischen Spezifikation."
+
+msgid "Start your first app"
+msgstr "Erste App starten"
+
+msgid "Starter"
+msgstr "Starter"
+
+msgid "Store publishing is separate."
+msgstr "Store-Veröffentlichung ist eine separate Leistung."
+
+msgid "Store submission as an optional A+ service"
+msgstr "Store-Einreichung als optionaler A+ Service"
+
+msgid "Successful"
+msgstr "Erfolgreich"
+
+msgid "Technical quality control"
+msgstr "Technische Qualitätskontrolle"
+
+msgid "Technology alone is not the product."
+msgstr "Technologie allein ist noch kein Produkt."
+
+msgid "Tell us what your business should do better."
+msgstr "Sagen Sie uns, was Ihr Unternehmen besser lösen soll."
+
+msgid "Test every version in a protected preview. Production remains untouched until you approve it."
+msgstr "Testen Sie jede Version in einer geschützten Vorschau. Die Produktion bleibt unverändert, bis Sie die Freigabe erteilen."
+
+msgid "The AI consultation identifies users, goals, essential features and whether a PWA is the right solution."
+msgstr "Die KI-Beratung identifiziert Nutzer, Ziele, wesentliche Funktionen und prüft, ob eine PWA die richtige Lösung ist."
+
+msgid "The approved version is now live. You can keep chatting with me to prepare the next update without affecting production."
+msgstr "Die freigegebene Version ist jetzt live. Sie können weiter mit mir chatten und das nächste Update vorbereiten, ohne die Produktion zu beeinflussen."
+
+msgid "The booking flow, customer account and loyalty dashboard are ready in the new preview."
+msgstr "Der Buchungsablauf, das Kundenkonto und das Loyalty-Dashboard sind in der neuen Vorschau bereit."
+
+msgid "The message is too long."
+msgstr "Die Nachricht ist zu lang."
+
+msgid "This change requires %(required)s credit(s), but your workspace currently has %(available)s. Add credits to continue."
+msgstr "Diese Änderung benötigt %(required)s Credit(s), Ihr Workspace verfügt aktuell jedoch über %(available)s. Fügen Sie Credits hinzu, um fortzufahren."
+
+msgid "Version"
+msgstr "Version"
+
+msgid "View the process"
+msgstr "Ablauf ansehen"
+
+msgid "WELCOME BACK"
+msgstr "WILLKOMMEN ZURÜCK"
+
+msgid "Welcome credits"
+msgstr "Willkommens-Credits"
+
+msgid "What happens next?"
+msgstr "Wie geht es weiter?"
+
+msgid "What should we build?"
+msgstr "Was sollen wir entwickeln?"
+
+msgid "Working on your request…"
+msgstr "Ihre Anfrage wird umgesetzt…"
+
+msgid "YOUR SERVICE. SIMPLIFIED."
+msgstr "IHR SERVICE. EINFACHER."
+
+msgid "YOUR SOFTWARE WORKSPACE"
+msgstr "IHR SOFTWARE-WORKSPACE"
+
+msgid "You"
+msgstr "Sie"
+
+msgid "You stay in control of decisions. A+ Studio takes care of the technical workflow behind them."
+msgstr "Sie behalten die Kontrolle über alle Entscheidungen. A+ Studio übernimmt den technischen Workflow dahinter."
+
+msgid "Your app idea."
+msgstr "Ihre App-Idee."
+
+msgid "Your app portfolio"
+msgstr "Ihr App-Portfolio"
+
+msgid "Your first PWA is ready. Open the preview and tell me what you would like to change. I can update the structure, text, colors, modules, forms, booking experience, products, loyalty and more."
+msgstr "Ihre erste PWA ist bereit. Öffnen Sie die Vorschau und teilen Sie mir mit, was geändert werden soll. Ich kann Struktur, Texte, Farben, Module, Formulare, Buchungserlebnis, Produkte, Loyalty-Funktionen und mehr aktualisieren."
+
+msgid "Your first app starts with one conversation."
+msgstr "Ihre erste App beginnt mit einem Gespräch."
+
+msgid "Your project is being prepared. The first preview will appear in the conversation."
+msgstr "Ihr Projekt wird vorbereitet. Die erste Vorschau erscheint anschließend im Gespräch."
+
+msgid "Your workspace includes consultation, AI development, private source code and a protected preview from the first version."
+msgstr "Ihr Workspace umfasst Beratung, KI-Entwicklung, privaten Quellcode und bereits ab der ersten Version eine geschützte Vorschau."
+
+msgid "ago"
+msgstr "vor"
+
+msgid "by chatting."
+msgstr "per Chat."
+
+msgid "failed safely"
+msgstr "sicher fehlgeschlagen"
+
+msgid "feature credits per month, managed hosting, SSL, backups, version history and preview deployments."
+msgstr "Feature-Credits pro Monat, Managed Hosting, SSL, Backups, Versionsverlauf und Vorschau-Deployments."
+
+msgid "iOS + Android"
+msgstr "iOS + Android"
+
+msgid "iOS only"
+msgstr "Nur iOS"
+
+msgid "or with email"
+msgstr "oder mit E-Mail"
+
+msgid "preview"
+msgstr "Vorschau"
+
+msgid "projects"
+msgstr "Projekte"
+

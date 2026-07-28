@@ -1,13 +1,49 @@
 {% extends 'base.html' %}
-{% block title %}Create account — A+ Studio{% endblock %}
-{% block body_class %}auth-body{% endblock %}
+{% load i18n socialaccount %}
+{% block title %}{% trans "Create an account" %} — A+ Studio{% endblock %}
+{% block body_class %}auth-body brand-auth{% endblock %}
 {% block content %}
-<div class="auth-shell wide-auth">
-  <a class="logo light" href="/"><span>A+</span> Studio</a>
-  <div class="auth-card">
-    <div class="eyebrow dark">START WITH 20 CREDITS</div><h1>Build your first PWA.</h1><p>Tell the AI what your business needs. Your first preview is created automatically.</p>
-    <form method="post" class="form-stack">{% csrf_token %}{{ form.as_p }}<button class="button full">Create workspace</button></form>
-    <div class="auth-footer">Already registered? <a href="{% url 'login' %}">Log in</a></div>
+<div class="auth-layout">
+  <a class="auth-brand" href="/">
+    <span class="auth-brand-image" role="img" aria-label="A+ Solution GmbH"></span>
+    <span><strong>A+ Studio</strong><small>by A+ Solution GmbH</small></span>
+  </a>
+  <div class="auth-story">
+    <div class="brand-kicker"><span></span>{% trans "FROM IDEA TO FIRST PREVIEW" %}</div>
+    <h2>{% trans "Start with the business need, not the technical specification." %}</h2>
+    <p>{% trans "Your workspace includes consultation, AI development, private source code and a protected preview from the first version." %}</p>
+    <div class="auth-story-points">
+      <span>{% trans "20 welcome credits" %}</span>
+      <span>{% trans "German-first interface" %}</span>
+      <span>{% trans "No card required" %}</span>
+    </div>
   </div>
+  <div class="auth-card premium-auth-card signup-card">
+    <div class="auth-card-head">
+      <div class="brand-kicker dark"><span></span>{% trans "CREATE YOUR WORKSPACE" %}</div>
+      <h1>{% trans "Start your first app" %}</h1>
+      <p>{% trans "Sign up with a provider or create an account using email." %}</p>
+    </div>
+    <div class="social-auth-stack">
+      {% if google_oauth_enabled %}
+      <form method="post" action="{% provider_login_url 'google' process='login' %}">{% csrf_token %}
+        <button class="social-auth-button google" type="submit"><span class="social-icon">G</span>{% trans "Sign up with Google" %}</button>
+      </form>
+      {% else %}
+      <button class="social-auth-button google disabled" type="button" disabled><span class="social-icon">G</span>{% trans "Google signup will be available soon" %}</button>
+      {% endif %}
+      {% if apple_oauth_enabled %}
+      <form method="post" action="{% provider_login_url 'apple' process='login' %}">{% csrf_token %}
+        <button class="social-auth-button apple" type="submit"><span class="social-icon apple-symbol">●</span>{% trans "Sign up with Apple" %}</button>
+      </form>
+      {% else %}
+      <button class="social-auth-button apple disabled" type="button" disabled><span class="social-icon apple-symbol">●</span>{% trans "Apple signup will be available soon" %}</button>
+      {% endif %}
+    </div>
+    <div class="auth-divider"><span>{% trans "or with email" %}</span></div>
+    <form method="post" class="form-stack auth-form">{% csrf_token %}{{ form.as_p }}<button class="brand-button full-width">{% trans "Create workspace" %}</button></form>
+    <div class="auth-footer">{% trans "Already registered?" %} <a href="{% url 'login' %}">{% trans "Log in" %}</a></div>
+  </div>
+  <div class="auth-language">{% include "partials/language_switcher.html" %}</div>
 </div>
 {% endblock %}

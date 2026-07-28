@@ -41,13 +41,26 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAIAPIKEY }}
           EMAIL_PASSWORD: ${{ secrets.EMAILPASSWORD }}
           GITHUB_TOKEN_VALUE: ${{ secrets.GITHUBTOKEN }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLECLIENTID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLECLIENTSECRET }}
+          APPLE_CLIENT_ID: ${{ secrets.APPLECLIENTID }}
+          APPLE_KEY_ID: ${{ secrets.APPLEKEYID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLETEAMID }}
+          APPLE_PRIVATE_KEY: ${{ secrets.APPLEPRIVATEKEY }}
         run: |
-          OPENAI_API_KEY_B64="$(printf '%s' "$OPENAI_API_KEY" | base64 -w0)"
-          EMAIL_PASSWORD_B64="$(printf '%s' "$EMAIL_PASSWORD" | base64 -w0)"
-          GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN_VALUE" | base64 -w0)"
+          encode() { printf '%s' "$1" | base64 -w0; }
+          OPENAI_API_KEY_B64="$(encode "$OPENAI_API_KEY")"
+          EMAIL_PASSWORD_B64="$(encode "$EMAIL_PASSWORD")"
+          GITHUB_TOKEN_B64="$(encode "$GITHUB_TOKEN_VALUE")"
+          GOOGLE_CLIENT_ID_B64="$(encode "$GOOGLE_CLIENT_ID")"
+          GOOGLE_CLIENT_SECRET_B64="$(encode "$GOOGLE_CLIENT_SECRET")"
+          APPLE_CLIENT_ID_B64="$(encode "$APPLE_CLIENT_ID")"
+          APPLE_KEY_ID_B64="$(encode "$APPLE_KEY_ID")"
+          APPLE_TEAM_ID_B64="$(encode "$APPLE_TEAM_ID")"
+          APPLE_PRIVATE_KEY_B64="$(encode "$APPLE_PRIVATE_KEY")"
           set +e
           sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
-            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' EMAIL_PASSWORD_B64='$EMAIL_PASSWORD_B64' GITHUB_TOKEN_B64='$GITHUB_TOKEN_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" \
+            "OPENAI_API_KEY_B64='$OPENAI_API_KEY_B64' EMAIL_PASSWORD_B64='$EMAIL_PASSWORD_B64' GITHUB_TOKEN_B64='$GITHUB_TOKEN_B64' GOOGLE_CLIENT_ID_B64='$GOOGLE_CLIENT_ID_B64' GOOGLE_CLIENT_SECRET_B64='$GOOGLE_CLIENT_SECRET_B64' APPLE_CLIENT_ID_B64='$APPLE_CLIENT_ID_B64' APPLE_KEY_ID_B64='$APPLE_KEY_ID_B64' APPLE_TEAM_ID_B64='$APPLE_TEAM_ID_B64' APPLE_PRIVATE_KEY_B64='$APPLE_PRIVATE_KEY_B64' GITHUB_SHA='$GITHUB_SHA' bash -s" \
             < scripts/deploy.sh > /tmp/a-studio-remote-deploy.log 2>&1
           status=$?
           set -e
@@ -59,34 +72,18 @@ jobs:
           HOST: ${{ secrets.HOST }}
         run: |
           set +e
-          echo "--- Runner DNS ---"
-          getent ahostsv4 studio.aplus-solution.de || true
-          getent ahostsv6 studio.aplus-solution.de || true
-          echo "--- Runner HTTPS attempts ---"
           for i in $(seq 1 20); do
             if curl -4 -fsS --connect-timeout 10 https://studio.aplus-solution.de/health/; then
               exit 0
             fi
             sleep 6
           done
-          echo "--- Runner verbose HTTPS ---"
           curl -4 -vk --connect-timeout 15 --max-time 30 https://studio.aplus-solution.de/health/ || true
-          echo "--- Remote public-edge diagnostics ---"
           sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" 'bash -s' <<'REMOTE'
           set +e
-          echo "DNS from server:"
-          getent ahostsv4 studio.aplus-solution.de || true
-          getent ahostsv6 studio.aplus-solution.de || true
-          echo "Listening ports:"
           ss -ltnp | grep -E ':(22|80|443|8000)\b' || true
           cd /opt/a-studio/current || exit 0
-          echo "Compose status:"
           docker compose ps -a || true
-          echo "Caddy logs:"
-          docker compose logs --no-color --tail=180 caddy || true
-          echo "HTTP through local Caddy:"
-          curl -v --connect-timeout 10 -H 'Host: studio.aplus-solution.de' http://127.0.0.1/health/ || true
-          echo "HTTPS through local Caddy:"
-          curl -vk --connect-timeout 15 --resolve studio.aplus-solution.de:443:127.0.0.1 https://studio.aplus-solution.de/health/ || true
+          docker compose logs --no-color --tail=180 caddy web || true
           REMOTE
           exit 1
