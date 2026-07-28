@@ -10,7 +10,7 @@ on:
 
 concurrency:
   group: a-studio-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,7 +19,6 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request' || (github.head_ref == 'agent/production-deploy-trigger' && github.actor == 'hsdarestani')
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - uses: actions/checkout@v4
         with:
