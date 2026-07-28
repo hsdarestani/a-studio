@@ -1,6 +1,8 @@
 name: Apply OpenAI model fallback fix
 
 on:
+  push:
+    branches: [agent/fix-openai-model-fallback]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -10,12 +12,12 @@ permissions:
 
 jobs:
   apply:
-    if: github.head_ref == 'agent/fix-openai-model-fallback' && github.actor == 'hsdarestani'
+    if: github.actor == 'hsdarestani'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: agent/fix-openai-model-fallback
           fetch-depth: 0
           token: ${{ secrets.GITHUBTOKEN }}
       - name: Patch model configuration and tests
@@ -100,4 +102,4 @@ jobs:
           git config user.email 'app@aplus-solution.de'
           git add -A
           git commit -m 'Use accessible OpenAI model with automatic fallback'
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git push origin HEAD:agent/fix-openai-model-fallback
