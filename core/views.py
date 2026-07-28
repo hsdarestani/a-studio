@@ -34,6 +34,28 @@ def _project_for(user, pk):
     return get_object_or_404(Project.objects.select_related("organization"), pk=pk, organization__memberships__user=user)
 
 
+def _project_state_payload(project):
+    project.refresh_from_db()
+    project.organization.refresh_from_db()
+    latest = project.deployments.order_by("-created_at").first()
+    return {
+        "id": str(project.id),
+        "status": project.status,
+        "version": project.version,
+        "credits": project.organization.credits,
+        "preview_url": project.preview_url,
+        "live_url": project.live_url,
+        "repo_url": project.repo_url,
+        "repo_name": project.repo_name,
+        "last_build_error": project.last_build_error,
+        "deployment": {
+            "status": latest.status,
+            "environment": latest.environment,
+            "version": latest.version,
+        } if latest else None,
+    }
+
+
 def landing(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
@@ -104,6 +126,13 @@ def project_detail(request, pk):
 
 
 @login_required
+@require_GET
+def project_status(request, pk):
+    project = _project_for(request.user, pk)
+    return JsonResponse(_project_state_payload(project))
+
+
+@login_required
 @require_POST
 def chat_submit(request, pk):
     project = _project_for(request.user, pk)
@@ -127,14 +156,19 @@ def message_status(request, pk, message_id):
     project = _project_for(request.user, pk)
     message = get_object_or_404(Message, pk=message_id, conversation__project=project)
     task_state = AsyncResult(message.task_id).state if message.task_id else message.status.upper()
+    state = _project_state_payload(project)
     return JsonResponse({
         "id": str(message.id),
         "status": message.status,
         "task_state": task_state,
         "content": message.content,
         "metadata": message.metadata,
-        "credits": project.organization.credits,
-        "project_status": Project.objects.get(pk=project.pk).status,
+        "credits": state["credits"],
+        "project_status": state["status"],
+        "project_version": state["version"],
+        "preview_url": state["preview_url"],
+        "repo_url": state["repo_url"],
+        "deployment": state["deployment"],
     })
 
 
