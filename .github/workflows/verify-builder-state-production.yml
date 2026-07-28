@@ -1,0 +1,67 @@
+name: Verify Builder state production
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'agent/verify-builder-state-production' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH helper
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+      - name: Verify deployed state endpoint and browser refresh code
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        run: |
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T web python manage.py shell <<'PY'
+          import json
+          from pathlib import Path
+          from django.test import Client
+          from django.urls import reverse
+          from core.models import Project
+
+          project = Project.objects.select_related("created_by").filter(name__iexact="Flavor").order_by("-created_at").first()
+          if not project:
+              raise RuntimeError("Flavor project not found")
+
+          client = Client()
+          client.force_login(project.created_by, backend="django.contrib.auth.backends.ModelBackend")
+          response = client.get(
+              reverse("project_status", args=[project.id]),
+              secure=True,
+              HTTP_HOST="studio.aplus-solution.de",
+          )
+          if response.status_code != 200:
+              raise RuntimeError(f"Project status endpoint returned {response.status_code}")
+          payload = response.json()
+          if payload.get("status") != "preview" or payload.get("version", 0) < 2:
+              raise RuntimeError(f"Unexpected Flavor state: {payload}")
+          if not payload.get("repo_url") or not payload.get("preview_url"):
+              raise RuntimeError("Flavor repository or preview URL is missing")
+
+          javascript = Path("/app/static/app.js").read_text()
+          for marker in ("monitorInitialBuild", "projectStatusUrl", "scheduleReload", "cache: 'no-store'"):
+              if marker not in javascript:
+                  raise RuntimeError(f"Deployed Builder script is missing {marker}")
+
+          print("BUILDER_STATE_PRODUCTION_OK", json.dumps({
+              "project": project.name,
+              "status": payload["status"],
+              "version": payload["version"],
+              "repo_url": payload["repo_url"],
+              "preview_url": payload["preview_url"],
+              "deployment": payload["deployment"],
+              "auto_refresh": True,
+          }, ensure_ascii=False))
+          PY
+          REMOTE
