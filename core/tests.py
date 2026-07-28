@@ -49,6 +49,23 @@ class GeneratorTests(TestCase):
             data = json.loads((root / "manifest.webmanifest").read_text())
             self.assertEqual(data["display"], "standalone")
 
+    def test_project_status_returns_current_build_and_repository_state(self):
+        self.project.status = "preview"
+        self.project.version = 2
+        self.project.repo_name = "astudio-app-luna"
+        self.project.repo_url = "https://github.com/example/astudio-app-luna"
+        self.project.save(update_fields=["status", "version", "repo_name", "repo_url", "updated_at"])
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("project_status", args=[self.project.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "preview")
+        self.assertEqual(payload["version"], 2)
+        self.assertEqual(payload["repo_name"], "astudio-app-luna")
+        self.assertEqual(payload["credits"], self.org.credits)
+
     @override_settings(
         OPENAI_API_KEY="test-key",
         OPENAI_MODEL="blocked-model",
