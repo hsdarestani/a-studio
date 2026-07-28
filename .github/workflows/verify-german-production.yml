@@ -1,0 +1,36 @@
+name: Verify German production pages
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'agent/verify-german-production' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert German default, English switch and social-login options
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -4 -fsSL --retry 5 --retry-all-errors --max-time 30 https://studio.aplus-solution.de/ -o /tmp/landing-de.html
+          grep -F '<html lang="de">' /tmp/landing-de.html
+          grep -F '<title>KI-App-Entwicklung für Unternehmen — A+ Studio</title>' /tmp/landing-de.html
+          grep -F 'A+ Solution GmbH' /tmp/landing-de.html
+
+          curl -4 -fsSL --retry 5 --retry-all-errors --max-time 30 -H 'Accept-Language: en' https://studio.aplus-solution.de/ -o /tmp/landing-en.html
+          grep -F '<html lang="en">' /tmp/landing-en.html
+          grep -F '<title>AI app development for businesses — A+ Studio</title>' /tmp/landing-en.html
+          grep -F 'Your app idea.' /tmp/landing-en.html
+
+          curl -4 -fsSL --retry 5 --retry-all-errors --max-time 30 https://studio.aplus-solution.de/accounts/login/ -o /tmp/login-de.html
+          grep -F '<html lang="de">' /tmp/login-de.html
+          grep -F 'Google' /tmp/login-de.html
+          grep -F 'Apple' /tmp/login-de.html
+          grep -F 'disabled' /tmp/login-de.html
+
+          echo 'PRODUCTION_UI_OK: German default, English rendering, A+ branding, Google option and Apple option verified.'
