@@ -49,7 +49,11 @@ class GeneratorTests(TestCase):
             data = json.loads((root / "manifest.webmanifest").read_text())
             self.assertEqual(data["display"], "standalone")
 
-    @override_settings(OPENAI_MODEL="blocked-model", OPENAI_FALLBACK_MODELS=["working-model"])
+    @override_settings(
+        OPENAI_API_KEY="test-key",
+        OPENAI_MODEL="blocked-model",
+        OPENAI_FALLBACK_MODELS=["working-model"],
+    )
     @patch("core.services.ai.OpenAI")
     def test_model_access_error_uses_configured_fallback(self, openai_class):
         response = Mock(output_text=json.dumps({
