@@ -165,7 +165,8 @@ CELERY_TASK_TIME_LIMIT = 600
 CELERY_TASK_SOFT_TIME_LIMIT = 540
 
 OPENAI_API_KEY = env("OPENAI_API_KEY")
-OPENAI_MODEL = env("OPENAI_MODEL", "gpt-5-mini")
+OPENAI_MODEL = env("OPENAI_MODEL", "gpt-4.1-mini")
+OPENAI_FALLBACK_MODELS = [x.strip() for x in env("OPENAI_FALLBACK_MODELS", "gpt-4o-mini,gpt-4.1-nano").split(",") if x.strip()]
 APP_PUBLIC_URL = env("APP_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 APP_ROOT_DOMAIN = env("APP_ROOT_DOMAIN", "studio.aplus-solution.de")
 APP_DATA_ROOT = Path(env("APP_DATA_ROOT", "/data/apps" if not DEBUG else str(BASE_DIR / ".data")))
