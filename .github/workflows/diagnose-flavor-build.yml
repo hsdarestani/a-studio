@@ -86,7 +86,7 @@ jobs:
           client = OpenAI(api_key=settings.OPENAI_API_KEY)
           for model in ('gpt-4.1-mini', 'gpt-4o-mini', 'gpt-4.1-nano'):
               try:
-                  response = client.responses.create(model=model, input='Reply only with OK.', max_output_tokens=8)
+                  response = client.responses.create(model=model, input='Reply only with OK.', max_output_tokens=16)
                   print(f'MODEL_OK {model}: {response.output_text[:20]}')
               except Exception as exc:
                   print(f'MODEL_FAIL {model}: {str(exc)[:300]}')
