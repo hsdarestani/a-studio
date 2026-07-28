@@ -143,7 +143,7 @@ def _extract_json(text):
 
 
 def _clean_nested(value, depth=0):
-    if depth > 5:
+    if depth > 8:
         return None
     if isinstance(value, str):
         return value[:2000]
@@ -165,7 +165,7 @@ def _clean_nested(value, depth=0):
             key_lower = key.lower()
             if not _SAFE_KEY.match(key):
                 continue
-            if key_lower in _BLOCKED_KEYS or key_lower.startswith("on"):
+            if key_lower in _BLOCKED_KEYS:
                 continue
             safe = _clean_nested(raw_value, depth + 1)
             if safe is not None:
