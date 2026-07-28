@@ -78,6 +78,19 @@ jobs:
                       'created_at': feature.created_at.isoformat(),
                   }, ensure_ascii=False, default=str))
           PY
+          echo '=== MODEL PROBE ==='
+          docker compose exec -T web python manage.py shell <<'PY'
+          from django.conf import settings
+          from openai import OpenAI
+
+          client = OpenAI(api_key=settings.OPENAI_API_KEY)
+          for model in ('gpt-4.1-mini', 'gpt-4o-mini', 'gpt-4.1-nano'):
+              try:
+                  response = client.responses.create(model=model, input='Reply only with OK.', max_output_tokens=8)
+                  print(f'MODEL_OK {model}: {response.output_text[:20]}')
+              except Exception as exc:
+                  print(f'MODEL_FAIL {model}: {str(exc)[:300]}')
+          PY
           echo '=== WORKER LOGS ==='
           docker compose logs --no-color --since=90m worker 2>&1 | tail -n 260
           echo '=== SANDBOX LOGS ==='
