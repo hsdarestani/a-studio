@@ -1,5 +1,5 @@
 {
-  email admin@aplus-solution.de
+  email app@aplus-solution.de
   on_demand_tls {
     ask http://web:8000/api/tls/allow/
   }

@@ -111,14 +111,19 @@ OPENAI_MODEL = env("OPENAI_MODEL", "gpt-5-mini")
 APP_PUBLIC_URL = env("APP_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 APP_ROOT_DOMAIN = env("APP_ROOT_DOMAIN", "studio.aplus-solution.de")
 APP_DATA_ROOT = Path(env("APP_DATA_ROOT", "/data/apps" if not DEBUG else str(BASE_DIR / ".data")))
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "studio@aplus-solution.de")
+
+EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", "smtp.strato.de")
+EMAIL_PORT = int(env("EMAIL_PORT", "465"))
+EMAIL_USE_SSL = env("EMAIL_USE_SSL", "1") == "1"
+EMAIL_USE_TLS = env("EMAIL_USE_TLS", "0") == "1"
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "app@aplus-solution.de")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "20"))
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "A+ Studio <app@aplus-solution.de>")
+SERVER_EMAIL = env("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+BILLING_CONTACT_EMAIL = env("BILLING_CONTACT_EMAIL", "app@aplus-solution.de")
 
 GITHUB_TOKEN = env("GITHUB_TOKEN")
 GITHUB_OWNER = env("GITHUB_OWNER", "hsdarestani")
 GITHUB_REPOSITORY_PREFIX = env("GITHUB_REPOSITORY_PREFIX", "astudio-app-")
-
-STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY")
-STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET")
-STRIPE_PRICE_STARTER = env("STRIPE_PRICE_STARTER")
-STRIPE_PRICE_BUSINESS = env("STRIPE_PRICE_BUSINESS")
-STRIPE_PRICE_PRO = env("STRIPE_PRICE_PRO")

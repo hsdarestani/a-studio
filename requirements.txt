@@ -6,6 +6,5 @@ gunicorn>=23,<24
 whitenoise>=6.9,<7
 openai>=1.99,<3
 requests>=2.32,<3
-stripe>=12,<14
 PyJWT>=2.10,<3
 cryptography>=45,<47

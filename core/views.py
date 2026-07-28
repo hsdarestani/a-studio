@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 import shutil
-import stripe
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -9,8 +8,6 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from .forms import ProjectCreateForm, SignUpForm
 from .models import Conversation, CreditTransaction, Membership, Message, Organization, Project, StoreSubmission
@@ -73,7 +70,7 @@ def project_create(request):
         project.created_by = request.user
         project.save()
         Conversation.objects.create(project=project)
-        task = provision_initial_project.delay(str(project.id))
+        provision_initial_project.delay(str(project.id))
         messages.success(request, "Your project is being provisioned. The first preview will appear in the conversation.")
         return redirect("project_detail", pk=project.id)
     return render(request, "project_create.html", {"form": form, "organization": organization})
@@ -164,56 +161,11 @@ def request_store_submission(request, pk):
 @login_required
 def billing(request):
     organization = _organization_for(request.user)
-    return render(request, "billing.html", {"organization": organization, "plans": PLANS})
-
-
-@login_required
-@require_POST
-def billing_checkout(request, plan):
-    organization = _organization_for(request.user)
-    if plan not in PLANS:
-        raise Http404
-    price_id = getattr(settings, f"STRIPE_PRICE_{plan.upper()}", "")
-    if not settings.STRIPE_SECRET_KEY or not price_id:
-        messages.error(request, "Stripe is not configured yet. Add the Stripe secret and price IDs to activate checkout.")
-        return redirect("billing")
-    stripe.api_key = settings.STRIPE_SECRET_KEY
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        line_items=[{"price": price_id, "quantity": 1}],
-        success_url=f"{settings.APP_PUBLIC_URL}{reverse('billing')}?success=1",
-        cancel_url=f"{settings.APP_PUBLIC_URL}{reverse('billing')}?cancelled=1",
-        customer_email=organization.billing_email or request.user.email,
-        metadata={"organization_id": str(organization.id), "plan": plan},
-    )
-    return redirect(session.url)
-
-
-@csrf_exempt
-def stripe_webhook(request):
-    if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_WEBHOOK_SECRET:
-        return HttpResponse(status=503)
-    payload = request.body
-    signature = request.META.get("HTTP_STRIPE_SIGNATURE", "")
-    try:
-        event = stripe.Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET)
-    except Exception:
-        return HttpResponse(status=400)
-    if event["type"] == "checkout.session.completed":
-        data = event["data"]["object"]
-        metadata = data.get("metadata", {})
-        org = Organization.objects.filter(pk=metadata.get("organization_id")).first()
-        plan = metadata.get("plan")
-        if org and plan in PLANS:
-            grant = PLANS[plan]["credits"]
-            org.plan = plan
-            org.credits += grant
-            org.save(update_fields=["plan", "credits", "updated_at"])
-            CreditTransaction.objects.create(
-                organization=org, kind="purchase", amount=grant, balance_after=org.credits,
-                description=f"{PLANS[plan]['name']} subscription credits", external_reference=data.get("id", ""),
-            )
-    return HttpResponse(status=200)
+    return render(request, "billing.html", {
+        "organization": organization,
+        "plans": PLANS,
+        "billing_contact_email": settings.BILLING_CONTACT_EMAIL,
+    })
 
 
 @login_required
