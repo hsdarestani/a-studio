@@ -42,7 +42,8 @@ POSTGRES_USER=astudio
 POSTGRES_PASSWORD=$DB_PASSWORD
 DATABASE_URL=postgresql://astudio:$DB_PASSWORD@db:5432/astudio
 REDIS_URL=redis://redis:6379/0
-OPENAI_MODEL=gpt-5-mini
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_FALLBACK_MODELS=gpt-4o-mini,gpt-4.1-nano
 APP_PUBLIC_URL=https://studio.aplus-solution.de
 APP_ROOT_DOMAIN=studio.aplus-solution.de
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
@@ -82,6 +83,8 @@ keys = [
 ]
 encoded = dict(zip(keys, sys.argv[2:]))
 defaults = {
+    "OPENAI_MODEL": "gpt-4.1-mini",
+    "OPENAI_FALLBACK_MODELS": "gpt-4o-mini,gpt-4.1-nano",
     "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
     "EMAIL_HOST": "smtp.strato.de",
     "EMAIL_PORT": "465",
@@ -112,6 +115,8 @@ for line in lines:
 
 for key, value in defaults.items():
     values.setdefault(key, value)
+if values.get("OPENAI_MODEL") in {"", "gpt-5-mini"}:
+    values["OPENAI_MODEL"] = "gpt-4.1-mini"
 for key, value in encoded.items():
     if value:
         # Keep the Apple .p8 key encoded so the dotenv file stays one-line-safe.
