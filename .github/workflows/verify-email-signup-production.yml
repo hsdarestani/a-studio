@@ -1,0 +1,78 @@
+name: Verify email signup production
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'agent/verify-email-signup-production' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH helper
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+      - name: Submit real signup and clean test data
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://studio.aplus-solution.de'
+          email="signup-smoke-${GITHUB_RUN_ID}@example.com"
+          password='A-Production-Smoke-Password-2026!'
+          cookies=/tmp/signup-cookies.txt
+          page=/tmp/signup-page.html
+          headers=/tmp/signup-headers.txt
+          body=/tmp/signup-body.html
+
+          cleanup() {
+            sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+              "cd /opt/a-studio/current && docker compose exec -T -e SMOKE_EMAIL='$email' web python manage.py shell" <<'PY' || true
+          import os
+          from django.contrib.auth import get_user_model
+          from core.models import Organization
+
+          email = os.environ['SMOKE_EMAIL']
+          User = get_user_model()
+          user = User.objects.filter(email=email).first()
+          if user:
+              Organization.objects.filter(owner=user).delete()
+              user.delete()
+              print('SIGNUP_SMOKE_CLEANED')
+          PY
+          }
+          trap cleanup EXIT
+
+          curl -4 -fsSL --retry 5 --retry-all-errors --max-time 30 \
+            -c "$cookies" "$base/accounts/signup/" -o "$page"
+          csrf="$(grep -oP 'name="csrfmiddlewaretoken" value="\K[^"]+' "$page" | head -n 1)"
+          test -n "$csrf"
+
+          status="$(curl -4 -sS --max-time 30 \
+            -D "$headers" -o "$body" -w '%{http_code}' \
+            -b "$cookies" -c "$cookies" \
+            -e "$base/accounts/signup/" \
+            --data-urlencode "csrfmiddlewaretoken=$csrf" \
+            --data-urlencode 'full_name=Production Smoke Test' \
+            --data-urlencode "email=$email" \
+            --data-urlencode 'company_name=A+ Signup Smoke GmbH' \
+            --data-urlencode "password1=$password" \
+            --data-urlencode "password2=$password" \
+            "$base/accounts/signup/")"
+
+          echo "Signup HTTP status: $status"
+          sed -n '1,12p' "$headers"
+          test "$status" = '302'
+          grep -Eqi '^location: .*/projects/new/?' "$headers"
+
+          dashboard_status="$(curl -4 -sS --max-time 30 -o /tmp/project-create.html -w '%{http_code}' \
+            -b "$cookies" "$base/projects/new/")"
+          echo "Authenticated project-create HTTP status: $dashboard_status"
+          test "$dashboard_status" = '200'
+          grep -Fq 'A+ Studio' /tmp/project-create.html
+          echo 'PRODUCTION_SIGNUP_OK: email signup created a session and reached the authenticated project flow.'
