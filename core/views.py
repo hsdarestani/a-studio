@@ -44,26 +44,25 @@ def signup(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
     form = SignUpForm(request.POST or None)
-
-if request.method == "POST" and form.is_valid():
-    with transaction.atomic():
-        user = form.save()
-        organization = Organization.objects.create(
-            name=form.cleaned_data["company_name"],
-            owner=user,
-            billing_email=user.email,
-            credits=20,
-        )
-        Membership.objects.create(organization=organization, user=user, role="owner")
-        CreditTransaction.objects.create(
-            organization=organization,
-            kind="grant",
-            amount=20,
-            balance_after=20,
-            description=_("Welcome credits"),
-        )
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-    return redirect("project_create")
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            user = form.save()
+            organization = Organization.objects.create(
+                name=form.cleaned_data["company_name"],
+                owner=user,
+                billing_email=user.email,
+                credits=20,
+            )
+            Membership.objects.create(organization=organization, user=user, role="owner")
+            CreditTransaction.objects.create(
+                organization=organization,
+                kind="grant",
+                amount=20,
+                balance_after=20,
+                description=_("Welcome credits"),
+            )
+            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        return redirect("project_create")
     return render(request, "registration/signup.html", {"form": form})
 
 
