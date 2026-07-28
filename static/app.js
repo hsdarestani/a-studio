@@ -4,11 +4,11 @@
   const lang = (document.documentElement.lang || 'de').toLowerCase();
   const copy = lang.startsWith('de') ? {
     you: 'Du', now: 'jetzt', working: 'Ich setze deine Anfrage um…', failed: 'sicher fehlgeschlagen', justNow: 'gerade eben',
-    openPreview: 'Vorschau öffnen ↗', stillRunning: 'Der Build läuft noch. Aktualisiere die Seite, um den neuesten Stand zu sehen.',
+    openPreview: 'Vorschau öffnen ↗', stillRunning: 'Der Build läuft noch. Der aktuelle Stand wird automatisch geladen.',
     startError: 'Der Build konnte nicht gestartet werden.'
   } : {
     you: 'You', now: 'now', working: 'Working on your request…', failed: 'failed safely', justNow: 'just now',
-    openPreview: 'Open preview ↗', stillRunning: 'The build is still running. Refresh this page to see the latest status.',
+    openPreview: 'Open preview ↗', stillRunning: 'The build is still running. The latest state will load automatically.',
     startError: 'Could not start the build.'
   };
 
@@ -22,12 +22,55 @@
   const submit = form.querySelector('button[type="submit"]');
   const textarea = form.querySelector('textarea');
   const csrf = form.querySelector('[name="csrfmiddlewaretoken"]').value;
+  const statusUrl = workspace.dataset.projectStatusUrl;
+  let knownStatus = workspace.dataset.projectStatus || '';
+  let knownVersion = Number(workspace.dataset.projectVersion || 0);
+  const repoWasLinked = workspace.dataset.repoLinked === '1';
+  let reloadScheduled = false;
 
   const scrollDown = () => { stream.scrollTop = stream.scrollHeight; };
   scrollDown();
 
   const escapeHtml = value => String(value || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const renderText = value => escapeHtml(value).replace(/\n/g, '<br>');
+  const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+  function scheduleReload(delay = 650) {
+    if (reloadScheduled) return;
+    reloadScheduled = true;
+    window.setTimeout(() => window.location.reload(), delay);
+  }
+
+  function projectStateChanged(data) {
+    const nextVersion = Number(data.project_version ?? data.version ?? knownVersion);
+    const nextStatus = data.project_status ?? data.status ?? knownStatus;
+    const repositoryAppeared = Boolean(data.repo_url) && !repoWasLinked;
+    return nextVersion > knownVersion || nextStatus !== knownStatus || repositoryAppeared;
+  }
+
+  async function monitorInitialBuild() {
+    if (!statusUrl || !['draft', 'building'].includes(knownStatus)) return;
+    for (let attempt = 0; attempt < 180; attempt++) {
+      await sleep(2000);
+      try {
+        const response = await fetch(statusUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
+        if (!response.ok) continue;
+        const data = await response.json();
+        if (credits) credits.textContent = data.credits;
+        const nextStatus = data.status || knownStatus;
+        const nextVersion = Number(data.version || knownVersion);
+        const finished = ['preview', 'live', 'error'].includes(nextStatus);
+        if (nextVersion > knownVersion || finished || (data.repo_url && !repoWasLinked)) {
+          scheduleReload();
+          return;
+        }
+        knownStatus = nextStatus;
+        knownVersion = nextVersion;
+      } catch (_error) {
+        // A transient status request must not interrupt the active workspace.
+      }
+    }
+  }
 
   function addMessage(role, content, id = '', working = false) {
     const article = document.createElement('article');
@@ -42,8 +85,8 @@
   async function poll(messageId, article) {
     const url = `${window.location.pathname}messages/${messageId}/`;
     for (let attempt = 0; attempt < 180; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      await sleep(2000);
+      const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
       if (!response.ok) continue;
       const data = await response.json();
       if (credits) credits.textContent = data.credits;
@@ -65,6 +108,7 @@
         textarea.disabled = false;
         textarea.focus();
         scrollDown();
+        if (projectStateChanged(data)) scheduleReload();
         return;
       }
     }
@@ -106,4 +150,6 @@
       form.requestSubmit();
     }
   });
+
+  monitorInitialBuild();
 })();
