@@ -30,6 +30,10 @@ jobs:
           python manage.py test
       - name: Compile Python
         run: python -m compileall -q .
+      - name: Validate Caddy configuration
+        run: |
+          docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Validate production containers
         run: |
           cp .env.example .env

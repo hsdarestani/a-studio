@@ -32,11 +32,13 @@ https:// {
   tls {
     on_demand
   }
-  @customer host_regexp customer ^(?P<slug>[a-z0-9][a-z0-9-]{1,61}[a-z0-9])\.studio\.aplus-solution\.de$
-  handle @customer {
-    root * /srv/apps/live/{re.customer.slug}
-    try_files {path} {path}/ /index.html
-    file_server
+
+  map {host} {customer_slug} {
+    ~^([a-z0-9][a-z0-9-]{1,61}[a-z0-9])\.studio\.aplus-solution\.de$ ${1}
+    default __unknown__
   }
-  respond "Unknown app" 404
+
+  root * /srv/apps/live/{customer_slug}
+  try_files {path} {path}/ /index.html
+  file_server
 }
