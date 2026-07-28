@@ -1,0 +1,125 @@
+name: Recover Flavor production build
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    if: github.head_ref == 'agent/recover-flavor-build' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install SSH helper
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+      - name: Retry Flavor request and verify preview
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        run: |
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T web python manage.py shell <<'PY'
+          import json
+          import time
+          import requests
+          from django.conf import settings
+          from core.models import Deployment, Message, Project
+          from core.tasks import process_chat_message
+
+          project = Project.objects.select_related("organization", "created_by").filter(name__iexact="Flavor").order_by("-created_at").first()
+          if not project:
+              raise RuntimeError("Flavor project was not found")
+
+          if project.version >= 2 and project.status == "preview" and not project.last_build_error:
+              assistant = project.conversation.messages.filter(role="assistant", status="done").order_by("-created_at").first()
+              print("FLAVOR_ALREADY_RECOVERED", json.dumps({
+                  "version": project.version,
+                  "status": project.status,
+                  "repo_url": project.repo_url,
+                  "assistant": assistant.content[:240] if assistant else "",
+              }, ensure_ascii=False))
+          else:
+              user_message = project.conversation.messages.filter(role="user").order_by("-created_at").first()
+              if not user_message:
+                  raise RuntimeError("Flavor user request was not found")
+
+              before_version = project.version
+              before_credits = project.organization.credits
+              assistant = Message.objects.create(
+                  conversation=project.conversation,
+                  role="assistant",
+                  content="Retrying the approved request with the recovered AI service…",
+                  status="queued",
+              )
+              task = process_chat_message.delay(str(user_message.id), str(assistant.id), project.created_by_id)
+              assistant.task_id = task.id
+              assistant.save(update_fields=["task_id", "updated_at"])
+              print("FLAVOR_RETRY_QUEUED", task.id)
+
+              for _ in range(180):
+                  time.sleep(2)
+                  assistant.refresh_from_db()
+                  if assistant.status in {"done", "failed"}:
+                      break
+              else:
+                  raise RuntimeError("Flavor recovery timed out")
+
+              project.refresh_from_db()
+              project.organization.refresh_from_db()
+              if assistant.status != "done":
+                  raise RuntimeError(f"Flavor recovery failed: {assistant.metadata}")
+              if project.status != "preview" or project.version <= before_version:
+                  raise RuntimeError(f"Unexpected project state after recovery: {project.status} v{project.version}")
+              if project.last_build_error:
+                  raise RuntimeError(f"Build error was not cleared: {project.last_build_error}")
+              if not project.repo_url or not project.repo_name:
+                  raise RuntimeError("Private project repository was not linked")
+
+              deployment = Deployment.objects.filter(project=project, environment="preview").order_by("-created_at").first()
+              if not deployment or deployment.status != "success" or deployment.version != project.version:
+                  raise RuntimeError("Successful preview deployment was not recorded")
+
+              preview = requests.get(project.preview_url, timeout=30)
+              preview.raise_for_status()
+              if project.name not in preview.text or len(preview.text) < 500:
+                  raise RuntimeError("Generated preview did not contain the expected app content")
+
+              headers = {
+                  "Authorization": f"Bearer {settings.GITHUB_TOKEN}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              }
+              repository = requests.get(
+                  f"https://api.github.com/repos/{settings.GITHUB_OWNER}/{project.repo_name}",
+                  headers=headers,
+                  timeout=30,
+              )
+              repository.raise_for_status()
+              if not repository.json().get("private"):
+                  raise RuntimeError("Flavor repository is not private")
+              source = requests.get(
+                  f"https://api.github.com/repos/{settings.GITHUB_OWNER}/{project.repo_name}/contents/app-spec.json",
+                  headers=headers,
+                  timeout=30,
+              )
+              source.raise_for_status()
+
+              print("FLAVOR_RECOVERY_OK", json.dumps({
+                  "version_before": before_version,
+                  "version_after": project.version,
+                  "credits_before": before_credits,
+                  "credits_after": project.organization.credits,
+                  "status": project.status,
+                  "preview_url": project.preview_url,
+                  "repo_url": project.repo_url,
+                  "deployment_status": deployment.status,
+                  "assistant": assistant.content[:500],
+              }, ensure_ascii=False))
+          PY
+          REMOTE
