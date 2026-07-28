@@ -1,0 +1,251 @@
+name: Verify Builder layout production
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/verify-builder-layout-production.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'agent/verify-builder-layout-production'
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.PASS }}
+      HOST: ${{ secrets.HOST }}
+      BASE_URL: https://studio.aplus-solution.de
+      TEST_EMAIL: builder-layout-${{ github.run_id }}@example.invalid
+      TEST_PASSWORD: Builder-${{ github.run_id }}-Aa9!
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH helper
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Regenerate Flavor and create temporary viewer
+        id: prepare
+        run: |
+          set -euo pipefail
+          OUTPUT=$(sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' TEST_PASSWORD='$TEST_PASSWORD' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" -e TEST_PASSWORD="$TEST_PASSWORD" web python manage.py shell <<'PY'
+          import os
+          from django.conf import settings
+          from django.contrib.auth import get_user_model
+          from django.urls import reverse
+          from core.models import Deployment, Membership, Project
+          from core.services.generator import generate_preview
+          from core.services.github import sync_project_repository
+
+          project = Project.objects.filter(name__iexact="Flavor").order_by("-created_at").first()
+          if not project:
+              raise RuntimeError("Flavor project not found")
+
+          root, checksum = generate_preview(project)
+          if settings.GITHUB_TOKEN:
+              sync_project_repository(project, root)
+
+          deployment = project.deployments.filter(
+              environment="preview",
+              version=project.version,
+          ).order_by("-created_at").first()
+          if deployment:
+              deployment.status = "success"
+              deployment.url = project.preview_url
+              deployment.checksum = checksum
+              deployment.save(update_fields=["status", "url", "checksum", "updated_at"])
+
+          index = (root / "index.html").read_text()
+          runtime = (root / "app.js").read_text()
+          service_worker = (root / "sw.js").read_text()
+          required_index = [
+              f"app.js?v={project.version}",
+              f"styles.css?v={project.version}",
+              "window.APP_CACHE_PREFIX",
+          ]
+          for marker in required_index:
+              if marker not in index:
+                  raise RuntimeError(f"Regenerated Flavor index is missing {marker}")
+          if "location.pathname.includes('/preview/')" not in runtime:
+              raise RuntimeError("Preview service-worker cleanup is missing")
+          if f"astudio-{project.slug}-v{project.version}" not in service_worker:
+              raise RuntimeError("Project-scoped service-worker cache is missing")
+
+          email = os.environ["TEST_EMAIL"]
+          password = os.environ["TEST_PASSWORD"]
+          User = get_user_model()
+          user, _created = User.objects.get_or_create(
+              username=email,
+              defaults={"email": email, "first_name": "Builder", "last_name": "Smoke"},
+          )
+          user.email = email
+          user.set_password(password)
+          user.save()
+          Membership.objects.update_or_create(
+              organization=project.organization,
+              user=user,
+              defaults={"role": "member"},
+          )
+
+          print("PROJECT_PATH=" + reverse("project_detail", args=[project.id]))
+          print(
+              "FLAVOR_ASSETS_REGENERATED",
+              {
+                  "version": project.version,
+                  "checksum": checksum,
+                  "preview_url": project.preview_url,
+              },
+          )
+          PY
+          REMOTE
+          )
+          echo "$OUTPUT"
+          PROJECT_PATH=$(printf '%s\n' "$OUTPUT" | sed -n 's/^PROJECT_PATH=//p' | tail -1)
+          test -n "$PROJECT_PATH"
+          echo "project_path=$PROJECT_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/builder-browser
+          cd /tmp/builder-browser
+          npm init -y >/dev/null
+          npm install playwright >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+
+      - name: Verify composer and interactive preview in a real browser
+        env:
+          PROJECT_PATH: ${{ steps.prepare.outputs.project_path }}
+        run: |
+          cd /tmp/builder-browser
+          cat > smoke.js <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const baseUrl = process.env.BASE_URL;
+            const projectPath = process.env.PROJECT_PATH;
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({ viewport: { width: 1792, height: 856 } });
+            const page = await context.newPage();
+
+            await page.goto(`${baseUrl}/accounts/login/`, { waitUntil: 'networkidle', timeout: 60000 });
+            await page.locator('input[name="username"]').fill(process.env.TEST_EMAIL);
+            await page.locator('input[name="password"]').fill(process.env.TEST_PASSWORD);
+            await Promise.all([
+              page.waitForURL(url => !url.pathname.includes('/accounts/login/'), { timeout: 30000 }),
+              page.locator('form.auth-form button[type="submit"]').click(),
+            ]);
+
+            await page.goto(`${baseUrl}${projectPath}`, { waitUntil: 'networkidle', timeout: 60000 });
+            await page.waitForSelector('#chat-form', { state: 'visible', timeout: 30000 });
+            await page.waitForSelector('#preview-frame', { state: 'visible', timeout: 30000 });
+
+            const readMetrics = () => page.evaluate(() => {
+              const composer = document.querySelector('#chat-form').getBoundingClientRect();
+              const stream = document.querySelector('#chat-stream').getBoundingClientRect();
+              const panel = document.querySelector('.builder-panel').getBoundingClientRect();
+              return {
+                viewportHeight: window.innerHeight,
+                composerTop: composer.top,
+                composerBottom: composer.bottom,
+                composerHeight: composer.height,
+                streamTop: stream.top,
+                streamBottom: stream.bottom,
+                panelTop: panel.top,
+                panelBottom: panel.bottom,
+              };
+            });
+
+            const initial = await readMetrics();
+            if (initial.composerBottom > initial.viewportHeight + 1) {
+              throw new Error(`Composer is below the viewport: ${JSON.stringify(initial)}`);
+            }
+            if (initial.composerHeight < 80 || initial.composerTop <= initial.streamTop) {
+              throw new Error(`Composer geometry is invalid: ${JSON.stringify(initial)}`);
+            }
+            if (initial.streamBottom > initial.composerTop + 1) {
+              throw new Error(`Chat stream overlaps the composer: ${JSON.stringify(initial)}`);
+            }
+
+            await page.locator('#chat-stream').evaluate(element => { element.scrollTop = 0; });
+            const atTop = await readMetrics();
+            await page.locator('#chat-stream').evaluate(element => { element.scrollTop = element.scrollHeight; });
+            const atBottom = await readMetrics();
+            if (Math.abs(atTop.composerTop - atBottom.composerTop) > 1) {
+              throw new Error(`Composer moved while chat scrolled: ${JSON.stringify({ atTop, atBottom })}`);
+            }
+
+            const iframeSrc = await page.locator('#preview-frame').getAttribute('src');
+            if (!iframeSrc || !iframeSrc.includes('preview=1') || !iframeSrc.includes('v=3')) {
+              throw new Error(`Iframe does not use cache-free preview mode: ${iframeSrc}`);
+            }
+
+            const previewFrame = page.frames().find(frame => frame.url().includes('/preview/flavor/'));
+            if (!previewFrame) throw new Error('Flavor preview frame was not found');
+            await previewFrame.waitForSelector('[data-action="start-quiz"]', { timeout: 30000 });
+            const previewText = await previewFrame.locator('body').innerText();
+            if (!previewText.includes('Your identity. Your signature scent.')) {
+              throw new Error(`Interactive Flavor hero was not rendered: ${previewText.slice(0, 300)}`);
+            }
+            if (previewText.includes('an app that suggest perfume brand')) {
+              throw new Error('Stale brochure preview is still visible');
+            }
+
+            await previewFrame.locator('[data-action="start-quiz"]').click();
+            const optionCount = await previewFrame.locator('.option').count();
+            if (optionCount !== 4) {
+              throw new Error(`Expected four interactive quiz options, received ${optionCount}`);
+            }
+
+            await page.waitForTimeout(1000);
+            const scopedWorkers = await previewFrame.evaluate(async () => {
+              if (!('serviceWorker' in navigator)) return 0;
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              return registrations.filter(registration => location.href.startsWith(registration.scope)).length;
+            });
+            if (scopedWorkers !== 0) {
+              throw new Error(`Preview still has ${scopedWorkers} scoped service worker(s)`);
+            }
+
+            await page.screenshot({ path: '/tmp/builder-browser/builder-fixed.png', fullPage: false });
+            console.log('BUILDER_LAYOUT_PRODUCTION_OK', JSON.stringify({
+              viewport: { width: 1792, height: 856 },
+              composer: initial,
+              iframe_src: iframeSrc,
+              quiz_options: optionCount,
+              scoped_service_workers: scopedWorkers,
+            }));
+            await browser.close();
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          JS
+          node smoke.js
+
+      - name: Upload verification screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: builder-layout-production
+          path: /tmp/builder-browser/builder-fixed.png
+          if-no-files-found: ignore
+
+      - name: Remove temporary viewer
+        if: always()
+        run: |
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" web python manage.py shell <<'PY'
+          import os
+          from django.contrib.auth import get_user_model
+          get_user_model().objects.filter(username=os.environ["TEST_EMAIL"]).delete()
+          print("TEMPORARY_BUILDER_VIEWER_REMOVED")
+          PY
+          REMOTE
