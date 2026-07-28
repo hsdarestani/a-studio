@@ -1,0 +1,110 @@
+name: Verify Flavor browser experience
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    if: github.head_ref == 'agent/rebuild-flavor-interactive' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/flavor-browser-test
+          cd /tmp/flavor-browser-test
+          npm init -y >/dev/null
+          npm install playwright >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+
+      - name: Complete the live Flavor quiz
+        run: |
+          cd /tmp/flavor-browser-test
+          cat > smoke.js <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              viewport: { width: 390, height: 844 },
+              serviceWorkers: 'block',
+            });
+            const page = await context.newPage();
+            const url = `https://studio.aplus-solution.de/preview/flavor/?browser-smoke=${Date.now()}`;
+            await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+
+            await page.locator('[data-action="start-quiz"]').click();
+            for (let step = 0; step < 6; step += 1) {
+              await page.locator('.option').first().click();
+              const next = page.locator('[data-action="quiz-next"]');
+              if (await next.isDisabled()) {
+                throw new Error(`Quiz next button remained disabled on step ${step + 1}`);
+              }
+              await next.click();
+            }
+
+            await page.waitForSelector('.match-card', { timeout: 15000 });
+            const matchCount = await page.locator('.match-card').count();
+            if (matchCount !== 6) {
+              throw new Error(`Expected six visible ranked matches, received ${matchCount}`);
+            }
+            const scoreText = await page.locator('.match-score').first().innerText();
+            if (!scoreText.includes('%')) {
+              throw new Error(`First match did not contain a percentage: ${scoreText}`);
+            }
+
+            await page.locator('[data-favorite]').first().click();
+            await page.locator('[data-view="favorites"]').click();
+            const favoriteCount = await page.locator('.match-card').count();
+            if (favoriteCount < 1) {
+              throw new Error('Favorite recommendation was not persisted in the Favorites view');
+            }
+
+            await page.locator('[data-view="profile"]').click();
+            const traitCount = await page.locator('.trait-fill').count();
+            if (traitCount < 3) {
+              throw new Error(`Expected a populated scent profile, received ${traitCount} traits`);
+            }
+
+            const storedState = await page.evaluate(() => {
+              const key = Object.keys(localStorage).find(item => item.startsWith('astudio:flavor:'));
+              return key ? JSON.parse(localStorage.getItem(key)) : null;
+            });
+            if (!storedState || Object.keys(storedState.answers || {}).length !== 6) {
+              throw new Error('Quiz answers were not persisted to localStorage');
+            }
+            if (!Array.isArray(storedState.results) || storedState.results.length !== 8) {
+              throw new Error('The complete eight-item recommendation ranking was not persisted');
+            }
+            if (!Array.isArray(storedState.favorites) || storedState.favorites.length < 1) {
+              throw new Error('Favorite selection was not persisted');
+            }
+
+            await page.screenshot({ path: 'flavor-profile.png', fullPage: true });
+            console.log('FLAVOR_BROWSER_OK', JSON.stringify({
+              url,
+              questions_answered: Object.keys(storedState.answers).length,
+              ranked_catalog_items: storedState.results.length,
+              visible_matches: matchCount,
+              favorites: storedState.favorites.length,
+              profile_traits: traitCount,
+              first_match_score: scoreText,
+            }));
+            await browser.close();
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          JS
+          node smoke.js
+
+      - name: Upload verification screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: flavor-interactive-profile
+          path: /tmp/flavor-browser-test/flavor-profile.png
+          retention-days: 7
