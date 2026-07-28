@@ -1,0 +1,117 @@
+name: Apply email signup fix
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'agent/fix-email-signup-500' && github.actor == 'hsdarestani'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUBTOKEN }}
+      - name: Patch signup and add regression test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          views = Path('core/views.py')
+          text = views.read_text()
+          text = text.replace(
+              'from django.contrib.auth.decorators import login_required\n',
+              'from django.contrib.auth.decorators import login_required\nfrom django.db import transaction\n',
+              1,
+          )
+          old = '''    if request.method == "POST" and form.is_valid():
+              user = form.save()
+              organization = Organization.objects.create(
+                  name=form.cleaned_data["company_name"],
+                  owner=user,
+                  billing_email=user.email,
+                  credits=20,
+              )
+              Membership.objects.create(organization=organization, user=user, role="owner")
+              CreditTransaction.objects.create(
+                  organization=organization,
+                  kind="grant",
+                  amount=20,
+                  balance_after=20,
+                  description=_("Welcome credits"),
+              )
+              login(request, user)
+              return redirect("project_create")
+          '''
+          new = '''    if request.method == "POST" and form.is_valid():
+              with transaction.atomic():
+                  user = form.save()
+                  organization = Organization.objects.create(
+                      name=form.cleaned_data["company_name"],
+                      owner=user,
+                      billing_email=user.email,
+                      credits=20,
+                  )
+                  Membership.objects.create(organization=organization, user=user, role="owner")
+                  CreditTransaction.objects.create(
+                      organization=organization,
+                      kind="grant",
+                      amount=20,
+                      balance_after=20,
+                      description=_("Welcome credits"),
+                  )
+                  login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+              return redirect("project_create")
+          '''
+          if old not in text:
+              raise SystemExit('Expected signup block not found')
+          views.write_text(text.replace(old, new, 1))
+
+          tests = Path('core/tests.py')
+          text = tests.read_text()
+          text = text.replace(
+              'from django.test import TestCase, override_settings\n',
+              'from django.test import TestCase, override_settings\nfrom django.urls import reverse\n',
+              1,
+          )
+          addition = '''
+
+          class SignupTests(TestCase):
+              def test_email_signup_logs_in_with_multiple_auth_backends(self):
+                  response = self.client.post(
+                      reverse("signup"),
+                      {
+                          "full_name": "Max Mustermann",
+                          "email": "max@example.com",
+                          "company_name": "Muster GmbH",
+                          "password1": "A-very-safe-password-2026!",
+                          "password2": "A-very-safe-password-2026!",
+                      },
+                  )
+
+                  self.assertRedirects(response, reverse("project_create"), fetch_redirect_response=False)
+                  user = User.objects.get(email="max@example.com")
+                  self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
+                  self.assertEqual(
+                      self.client.session["_auth_user_backend"],
+                      "django.contrib.auth.backends.ModelBackend",
+                  )
+                  organization = Organization.objects.get(owner=user)
+                  self.assertEqual(organization.credits, 20)
+                  self.assertTrue(Membership.objects.filter(organization=organization, user=user, role="owner").exists())
+          '''
+          if 'class SignupTests(TestCase):' not in text:
+              tests.write_text(text + addition)
+          PY
+          rm -f .github/workflows/apply-signup-fix.yml
+          git config user.name 'A+ Studio Automation'
+          git config user.email 'app@aplus-solution.de'
+          git add -A
+          git commit -m 'Fix email signup with multiple auth backends'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
