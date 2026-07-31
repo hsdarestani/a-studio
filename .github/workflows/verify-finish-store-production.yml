@@ -1,0 +1,103 @@
+name: Verify finish and Store production
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/verify-finish-store-production.yml
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.head_ref == 'agent/verify-workflow-production'
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.PASS }}
+      HOST: ${{ secrets.HOST }}
+      BASE_URL: https://studio.aplus-solution.de
+      TEST_EMAIL: finish-smoke-${{ github.run_id }}@example.invalid
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass >/dev/null
+          mkdir -p /tmp/finish-browser && cd /tmp/finish-browser
+          npm init -y >/dev/null && npm install playwright-core >/dev/null
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || true)"
+          test -n "$CHROME_PATH"
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
+
+      - name: Prepare authenticated active build
+        id: prepare
+        run: |
+          set -euo pipefail
+          OUTPUT=$(sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' bash -s" <<'REMOTE'
+          cd /opt/a-studio/current
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" web python manage.py shell <<'PY'
+          import os
+          from django.conf import settings
+          from django.contrib.auth import get_user_model
+          from django.contrib.sessions.backends.db import SessionStore
+          from core.models import Conversation, Membership, Message, Organization, Project
+          from core.services.ai import initial_spec
+          from core.services.generator import generate_preview
+          U=get_user_model(); email=os.environ['TEST_EMAIL']
+          user=U.objects.create_user(username=email,email=email,password='unused')
+          org=Organization.objects.create(name='Finish Smoke '+email.split('@')[0],owner=user,credits=20)
+          Membership.objects.create(organization=org,user=user,role='owner')
+          p=Project.objects.create(organization=org,created_by=user,name='Finish Smoke App',business_type='Test',description='Finish refresh smoke',language='en',status='preview',version=1,app_spec=initial_spec('Finish Smoke App','Test','Finish refresh smoke','en'))
+          c=Conversation.objects.create(project=p); generate_preview(p)
+          m=Message.objects.create(conversation=c,role='assistant',content='Request queued. A+ Builder is preparing the build.',status='working',metadata={'progress':{'stage':'building','percent':60}})
+          flavor=Project.objects.filter(name__iexact='Flavor').order_by('-created_at').first(); Membership.objects.create(organization=flavor.organization,user=user,role='viewer')
+          submission=flavor.store_submissions.order_by('-created_at').first()
+          s=SessionStore(); s['_auth_user_id']=str(user.pk); s['_auth_user_backend']='django.contrib.auth.backends.ModelBackend'; s['_auth_user_hash']=user.get_session_auth_hash(); s.save()
+          print('BUILD_PATH=/projects/'+str(p.id)+'/'); print('MESSAGE_ID='+str(m.id)); print('STORE_PATH=/projects/'+str(flavor.id)+'/store-submissions/'); print('STORE_REQUEST_ID='+str(submission.id)); print('COOKIE='+s.session_key)
+          PY
+          REMOTE
+          )
+          for key in BUILD_PATH MESSAGE_ID STORE_PATH STORE_REQUEST_ID COOKIE; do value=$(printf '%s\n' "$OUTPUT"|sed -n "s/^${key}=//p"|tail -1); test -n "$value"; echo "${key,,}=$value" >> "$GITHUB_OUTPUT"; done
+
+      - name: Verify progress survives refresh and finish refreshes automatically
+        env:
+          BUILD_PATH: ${{ steps.prepare.outputs.build_path }}
+          MESSAGE_ID: ${{ steps.prepare.outputs.message_id }}
+          STORE_PATH: ${{ steps.prepare.outputs.store_path }}
+          STORE_REQUEST_ID: ${{ steps.prepare.outputs.store_request_id }}
+          COOKIE: ${{ steps.prepare.outputs.cookie }}
+        run: |
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "MESSAGE_ID='$MESSAGE_ID' bash -s" <<'REMOTE'
+          cd /opt/a-studio/current
+          export MESSAGE_ID
+          nohup bash -c 'sleep 10; cd /opt/a-studio/current; docker compose exec -T -e MESSAGE_ID="$MESSAGE_ID" web python manage.py shell <<"PY"
+          import os
+          from django.utils import timezone
+          from core.models import Message
+          m=Message.objects.select_related("conversation__project").get(pk=os.environ["MESSAGE_ID"]); p=m.conversation.project; p.status="preview"; p.save(update_fields=["status","updated_at"]); m.content="Smoke build complete"; m.status="done"; m.metadata={"action":"preview_ready","preview_url":p.preview_url,"version":p.version,"progress":{"stage":"ready","percent":100,"updated_at":timezone.now().isoformat()}}; m.save(update_fields=["content","status","metadata","updated_at"])
+          PY' >/tmp/finish-smoke.log 2>&1 </dev/null &
+          REMOTE
+          cd /tmp/finish-browser
+          cat > smoke.js <<'JS'
+          const {chromium}=require('playwright-core');
+          (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH,args:['--no-sandbox']});const ctx=await browser.newContext({viewport:{width:1792,height:856}});await ctx.addCookies([{name:'sessionid',value:process.env.COOKIE,domain:'studio.aplus-solution.de',path:'/',secure:true,httpOnly:true,sameSite:'Lax'}]);const page=await ctx.newPage();await page.goto(process.env.BASE_URL+process.env.BUILD_PATH,{waitUntil:'networkidle',timeout:60000});await page.waitForFunction(()=>window.ASTUDIO_WORKFLOW_V2===true);await page.locator('#build-lock').waitFor({state:'visible'});await page.waitForFunction(()=>document.body.innerText.includes('60%'));await page.reload({waitUntil:'networkidle'});await page.waitForFunction(()=>window.ASTUDIO_WORKFLOW_V2===true);await page.locator('#build-lock').waitFor({state:'visible'});await page.waitForFunction(()=>document.body.innerText.includes('60%'));await page.waitForFunction(()=>document.body.innerText.includes('Smoke build complete'),{timeout:25000});await page.waitForFunction(()=>!document.querySelector('#chat-form').classList.contains('busy'),{timeout:10000});if(await page.locator('#chat-form textarea').isDisabled())throw new Error('Composer did not unlock');await page.goto(process.env.BASE_URL+process.env.STORE_PATH,{waitUntil:'networkidle',timeout:60000});await page.locator('.store-request-card').first().waitFor({state:'visible'});const txt=await page.locator('body').innerText();if(!txt.includes(process.env.STORE_REQUEST_ID.slice(0,8)))throw new Error('Store request history missing');await page.screenshot({path:'/tmp/finish-browser/finish-store-production.png',fullPage:true});console.log('FINISH_STORE_PRODUCTION_OK',JSON.stringify({refresh_resume:true,progress:60,auto_finish:true,store_request:process.env.STORE_REQUEST_ID}));await browser.close();})().catch(e=>{console.error(e);process.exit(1)});
+          JS
+          node smoke.js
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: finish-store-production
+          path: /tmp/finish-browser/finish-store-production.png
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: |
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' bash -s" <<'REMOTE'
+          cd /opt/a-studio/current
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" web python manage.py shell <<'PY'
+          import os
+          from django.contrib.auth import get_user_model
+          from core.models import Organization
+          email=os.environ['TEST_EMAIL']; Organization.objects.filter(name__startswith='Finish Smoke '+email.split('@')[0]).delete(); get_user_model().objects.filter(username=email).delete(); print('FINISH_SMOKE_CLEANED')
+          PY
+          REMOTE
