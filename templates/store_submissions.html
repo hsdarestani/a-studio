@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Store publishing" %} — {{ project.name }} — A+ Studio{% endblock %}
+{% block content %}
+<main class="store-page-shell">
+  <header class="store-page-head">
+    <div>
+      <a class="back-link" href="{% url 'project_detail' project.id %}">← {% trans "Back to builder" %}</a>
+      <span class="store-page-kicker">{% trans "A+ STORE OPERATIONS" %}</span>
+      <h1>{% trans "Store publishing requests" %}</h1>
+      <p>{% trans "Follow every request from A+ eligibility review through Apple and Google store approval." %}</p>
+    </div>
+    <div class="store-project-chip"><strong>{{ project.name }}</strong><span>{{ organization.name }}</span></div>
+  </header>
+
+  <section class="store-process-strip" aria-label="{% trans 'Publishing process' %}">
+    <span><b>1</b>{% trans "Request" %}</span>
+    <span><b>2</b>{% trans "Eligibility" %}</span>
+    <span><b>3</b>{% trans "Accounts" %}</span>
+    <span><b>4</b>{% trans "Package" %}</span>
+    <span><b>5</b>{% trans "Store review" %}</span>
+    <span><b>6</b>{% trans "Approval" %}</span>
+  </section>
+
+  <section class="store-request-list">
+    {% for card in submission_cards %}
+    {% with submission=card.submission %}
+    <article class="store-request-card status-{{ submission.status }}">
+      <div class="store-request-card-head">
+        <div>
+          <span class="store-request-id">#{{ submission.id|stringformat:'s'|slice:':8' }}</span>
+          <h2>{{ submission.get_platform_display }}</h2>
+        </div>
+        <span class="store-status-chip {{ submission.status }}">{{ card.label }}</span>
+      </div>
+
+      <div class="store-progress-row"><span>{% trans "Progress" %}</span><b>{{ card.percent }}%</b></div>
+      <div class="store-progress-track"><i style="width:{{ card.percent }}%"></i></div>
+
+      <div class="store-request-grid">
+        <div><small>{% trans "Requested" %}</small><strong>{{ submission.created_at|date:'d.m.Y · H:i' }}</strong></div>
+        <div><small>{% trans "Last update" %}</small><strong>{{ submission.updated_at|date:'d.m.Y · H:i' }}</strong></div>
+        <div><small>{% trans "Requested by" %}</small><strong>{{ submission.requested_by.get_full_name|default:submission.requested_by.email }}</strong></div>
+        {% if submission.quoted_price %}<div><small>{% trans "Quoted price" %}</small><strong>€{{ submission.quoted_price }}</strong></div>{% endif %}
+      </div>
+
+      <div class="store-next-step"><small>{% trans "What happens now" %}</small><p>{{ card.next_step }}</p></div>
+      {% if submission.notes %}<div class="store-notes"><small>{% trans "Your notes" %}</small><p>{{ submission.notes|linebreaksbr }}</p></div>{% endif %}
+      {% if submission.external_reference %}<div class="store-reference"><small>{% trans "Store reference" %}</small><code>{{ submission.external_reference }}</code></div>{% endif %}
+    </article>
+    {% endwith %}
+    {% empty %}
+    <div class="store-empty-state">
+      <div class="store-empty-icon">↗</div>
+      <h2>{% trans "No store publishing request yet" %}</h2>
+      <p>{% trans "Return to the builder and request publishing when the approved production version is ready." %}</p>
+      <a class="button" href="{% url 'project_detail' project.id %}">{% trans "Back to builder" %}</a>
+    </div>
+    {% endfor %}
+  </section>
+
+  <aside class="store-support-note">
+    <div><strong>{% trans "A+ Solution is notified automatically" %}</strong><p>{% trans "New requests are sent to the A+ operations inbox. When A+ changes a request status, the requester receives an email update and the new status appears here." %}</p></div>
+    <a href="mailto:app@aplus-solution.de">app@aplus-solution.de</a>
+  </aside>
+</main>
+{% endblock %}
