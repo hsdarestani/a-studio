@@ -9,7 +9,13 @@ from .tasks import notify_store_submission
 
 User = get_user_model()
 
+TEST_STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
+
+@override_settings(STORAGES=TEST_STORAGES)
 class WorkflowUXTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="owner-workflow@example.com", email="owner-workflow@example.com", password="safe-password-123", first_name="Max", last_name="Mustermann")
@@ -61,7 +67,13 @@ class WorkflowUXTests(TestCase):
         delay.assert_not_called()
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", DEFAULT_FROM_EMAIL="A+ Studio <app@aplus-solution.de>", BILLING_CONTACT_EMAIL="ops@example.com", APP_PUBLIC_URL="https://studio.example.com")
+@override_settings(
+    STORAGES=TEST_STORAGES,
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="A+ Studio <app@aplus-solution.de>",
+    BILLING_CONTACT_EMAIL="ops@example.com",
+    APP_PUBLIC_URL="https://studio.example.com",
+)
 class StoreNotificationTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="store-user@example.com", email="store-user@example.com", password="safe-password-123")
