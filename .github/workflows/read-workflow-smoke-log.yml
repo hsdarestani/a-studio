@@ -1,0 +1,20 @@
+name: Read workflow smoke log
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/read-workflow-smoke-log.yml
+permissions:
+  contents: read
+jobs:
+  read:
+    if: github.head_ref == 'agent/verify-workflow-production'
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.PASS }}
+      HOST: ${{ secrets.HOST }}
+    steps:
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass >/dev/null
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" 'cat /tmp/astudio-workflow-smoke.log 2>/dev/null || true'
