@@ -1,0 +1,247 @@
+name: Verify workflow UX production
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/verify-workflow-production.yml
+
+concurrency:
+  group: verify-workflow-ux-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'agent/verify-workflow-production'
+    runs-on: ubuntu-latest
+    env:
+      SSHPASS: ${{ secrets.PASS }}
+      HOST: ${{ secrets.HOST }}
+      BASE_URL: https://studio.aplus-solution.de
+      TEST_EMAIL: workflow-smoke-${{ github.run_id }}@example.invalid
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH helper
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Prepare production fixtures and notify A+ for existing Flavor request
+        id: prepare
+        run: |
+          set -euo pipefail
+          OUTPUT=$(sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" web python manage.py shell <<'PY'
+          import os
+          from django.conf import settings
+          from django.contrib.auth import get_user_model
+          from django.contrib.sessions.backends.db import SessionStore
+          from core.models import AuditEvent, Conversation, Membership, Message, Organization, Project
+          from core.services.ai import initial_spec
+          from core.services.generator import generate_preview
+          from core.tasks import notify_store_submission
+
+          User = get_user_model()
+          email = os.environ['TEST_EMAIL']
+          User.objects.filter(username=email).delete()
+          Organization.objects.filter(name__startswith='Workflow Smoke ').delete()
+
+          user = User.objects.create_user(username=email, email=email, password='unused-smoke-password')
+          org = Organization.objects.create(name='Workflow Smoke ' + email.split('@')[0], owner=user, credits=20)
+          Membership.objects.create(organization=org, user=user, role='owner')
+          project = Project.objects.create(
+              organization=org,
+              created_by=user,
+              name='Workflow Smoke App',
+              business_type='Test',
+              description='Production feedback-loop smoke test',
+              language='en',
+              status='preview',
+              version=1,
+              app_spec=initial_spec('Workflow Smoke App', 'Test', 'Production feedback-loop smoke test', 'en'),
+          )
+          conversation = Conversation.objects.create(project=project)
+          generate_preview(project)
+          active = Message.objects.create(
+              conversation=conversation,
+              role='assistant',
+              content='Request queued. A+ Builder is preparing the build.',
+              status='queued',
+              metadata={'progress': {'stage': 'queued', 'percent': 5}},
+          )
+
+          flavor = Project.objects.filter(name__iexact='Flavor').order_by('-created_at').first()
+          if flavor is None:
+              raise RuntimeError('Flavor project not found')
+          Membership.objects.update_or_create(organization=flavor.organization, user=user, defaults={'role': 'viewer'})
+          submission = flavor.store_submissions.order_by('-created_at').first()
+          if submission is None:
+              raise RuntimeError('Existing Flavor store publishing request not found')
+          already_notified = AuditEvent.objects.filter(
+              project=flavor,
+              action='store_submission_notification_sent',
+              payload__submission_id=str(submission.id),
+          ).exists()
+          notified_now = False
+          if not already_notified:
+              notify_store_submission.run(str(submission.id))
+              notified_now = True
+
+          session = SessionStore()
+          session['_auth_user_id'] = str(user.pk)
+          session['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
+          session['_auth_user_hash'] = user.get_session_auth_hash()
+          session.save()
+
+          print('BUILD_PATH=/projects/' + str(project.id) + '/')
+          print('MESSAGE_ID=' + str(active.id))
+          print('STORE_PATH=/projects/' + str(flavor.id) + '/store-submissions/')
+          print('STORE_REQUEST_ID=' + str(submission.id))
+          print('STORE_REQUEST_STATUS=' + submission.status)
+          print('STORE_REQUEST_PLATFORM=' + submission.platform)
+          print('STORE_NOTIFIED_NOW=' + ('1' if notified_now else '0'))
+          print('STORE_TEAM_EMAIL=' + getattr(settings, 'STORE_REVIEW_EMAIL', settings.BILLING_CONTACT_EMAIL))
+          print('SESSION_COOKIE_NAME=' + settings.SESSION_COOKIE_NAME)
+          print('SESSION_COOKIE_VALUE=' + session.session_key)
+          PY
+          REMOTE
+          )
+          printf '%s\n' "$OUTPUT" | grep -v '^SESSION_COOKIE_VALUE='
+          for key in BUILD_PATH MESSAGE_ID STORE_PATH STORE_REQUEST_ID STORE_REQUEST_STATUS STORE_REQUEST_PLATFORM STORE_NOTIFIED_NOW STORE_TEAM_EMAIL SESSION_COOKIE_NAME SESSION_COOKIE_VALUE; do
+            value=$(printf '%s\n' "$OUTPUT" | sed -n "s/^${key}=//p" | tail -1)
+            test -n "$value"
+            echo "${key,,}=$value" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Prepare installed Chrome
+        run: |
+          mkdir -p /tmp/workflow-browser
+          cd /tmp/workflow-browser
+          npm init -y >/dev/null
+          npm install playwright-core >/dev/null
+          CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME_PATH"
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
+
+      - name: Verify refresh recovery, progress UI, duplicate guard and Store history
+        env:
+          BUILD_PATH: ${{ steps.prepare.outputs.build_path }}
+          MESSAGE_ID: ${{ steps.prepare.outputs.message_id }}
+          STORE_PATH: ${{ steps.prepare.outputs.store_path }}
+          STORE_REQUEST_ID: ${{ steps.prepare.outputs.store_request_id }}
+          SESSION_COOKIE_NAME: ${{ steps.prepare.outputs.session_cookie_name }}
+          SESSION_COOKIE_VALUE: ${{ steps.prepare.outputs.session_cookie_value }}
+        run: |
+          set -euo pipefail
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "MESSAGE_ID='$MESSAGE_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          cat > "/tmp/astudio-workflow-${MESSAGE_ID}.sh" <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd /opt/a-studio/current
+          sleep 6
+          docker compose exec -T -e MESSAGE_ID="$MESSAGE_ID" web python manage.py shell <<'PY'
+          import os
+          from django.utils import timezone
+          from core.models import Message
+          m=Message.objects.get(pk=os.environ['MESSAGE_ID']); meta=dict(m.metadata or {}); meta['progress']={'stage':'building','percent':60,'updated_at':timezone.now().isoformat()}; m.status='working'; m.metadata=meta; m.save(update_fields=['status','metadata','updated_at'])
+          PY
+          sleep 6
+          docker compose exec -T -e MESSAGE_ID="$MESSAGE_ID" web python manage.py shell <<'PY'
+          import os
+          from django.utils import timezone
+          from core.models import Message
+          m=Message.objects.get(pk=os.environ['MESSAGE_ID']); meta=dict(m.metadata or {}); meta['progress']={'stage':'syncing','percent':88,'updated_at':timezone.now().isoformat()}; m.status='working'; m.metadata=meta; m.save(update_fields=['status','metadata','updated_at'])
+          PY
+          sleep 6
+          docker compose exec -T -e MESSAGE_ID="$MESSAGE_ID" web python manage.py shell <<'PY'
+          import os
+          from django.utils import timezone
+          from core.models import Message
+          m=Message.objects.select_related('conversation__project').get(pk=os.environ['MESSAGE_ID']); p=m.conversation.project; p.status='preview'; p.save(update_fields=['status','updated_at']); m.content='Smoke build complete'; m.status='done'; m.metadata={'action':'preview_ready','preview_url':p.preview_url,'version':p.version,'progress':{'stage':'ready','percent':100,'updated_at':timezone.now().isoformat()}}; m.save(update_fields=['content','status','metadata','updated_at'])
+          PY
+          rm -f "$0"
+          SCRIPT
+          chmod +x "/tmp/astudio-workflow-${MESSAGE_ID}.sh"
+          export MESSAGE_ID
+          nohup "/tmp/astudio-workflow-${MESSAGE_ID}.sh" >/tmp/astudio-workflow-smoke.log 2>&1 </dev/null &
+          REMOTE
+
+          cd /tmp/workflow-browser
+          cat > smoke.js <<'JS'
+          const { chromium } = require('playwright-core');
+          (async()=>{
+            const base=process.env.BASE_URL;
+            const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH,args:['--no-sandbox']});
+            const context=await browser.newContext({viewport:{width:1792,height:856}});
+            await context.addCookies([{name:process.env.SESSION_COOKIE_NAME,value:process.env.SESSION_COOKIE_VALUE,domain:'studio.aplus-solution.de',path:'/',secure:true,httpOnly:true,sameSite:'Lax'}]);
+            const page=await context.newPage();
+            await page.goto(base+process.env.BUILD_PATH,{waitUntil:'networkidle',timeout:60000});
+            await page.waitForFunction(()=>window.ASTUDIO_WORKFLOW_V2===true,{timeout:30000});
+            await page.locator('#build-lock').waitFor({state:'visible',timeout:10000});
+            if(!(await page.locator('#chat-form textarea').isDisabled())) throw new Error('Composer is not locked during active build');
+
+            const duplicate=await page.evaluate(async()=>{const form=document.getElementById('chat-form');const fd=new FormData();fd.append('message','Duplicate smoke request');fd.append('csrfmiddlewaretoken',form.querySelector('[name="csrfmiddlewaretoken"]').value);const r=await fetch(form.action,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});return {status:r.status,body:await r.json()};});
+            if(duplicate.status!==409) throw new Error('Server did not reject duplicate build: '+JSON.stringify(duplicate));
+
+            await page.reload({waitUntil:'networkidle'});
+            await page.waitForFunction(()=>window.ASTUDIO_WORKFLOW_V2===true,{timeout:30000});
+            await page.locator('#build-lock').waitFor({state:'visible',timeout:10000});
+            await page.waitForFunction(()=>document.body.innerText.includes('60%'),{timeout:20000});
+            await page.waitForFunction(()=>document.body.innerText.includes('88%'),{timeout:20000});
+            await page.waitForFunction(()=>document.body.innerText.includes('Smoke build complete') && !document.querySelector('#chat-form').classList.contains('busy'),{timeout:30000});
+            if(await page.locator('#chat-form textarea').isDisabled()) throw new Error('Composer stayed locked after build completion');
+            const storeLink=page.locator('.store-requests-link');
+            await storeLink.waitFor({state:'visible',timeout:10000});
+
+            await page.goto(base+process.env.STORE_PATH,{waitUntil:'networkidle',timeout:60000});
+            await page.locator('.store-request-card').first().waitFor({state:'visible',timeout:10000});
+            const body=await page.locator('body').innerText();
+            if(!body.includes(process.env.STORE_REQUEST_ID.slice(0,8))) throw new Error('Existing store request is missing from history page');
+            await page.waitForFunction(()=>getComputedStyle(document.querySelector('.store-request-card')).borderRadius!=='0px',{timeout:10000});
+            await page.screenshot({path:'/tmp/workflow-browser/workflow-production.png',fullPage:true});
+            console.log('WORKFLOW_PRODUCTION_OK',JSON.stringify({duplicate_status:duplicate.status,refresh_resume:true,progress_stages:[60,88,100],store_request:process.env.STORE_REQUEST_ID}));
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+          node smoke.js
+
+      - name: Store notification result
+        run: |
+          echo "STORE_REQUEST_ID=${{ steps.prepare.outputs.store_request_id }}"
+          echo "STORE_REQUEST_STATUS=${{ steps.prepare.outputs.store_request_status }}"
+          echo "STORE_REQUEST_PLATFORM=${{ steps.prepare.outputs.store_request_platform }}"
+          echo "STORE_NOTIFIED_NOW=${{ steps.prepare.outputs.store_notified_now }}"
+          echo "STORE_TEAM_EMAIL=${{ steps.prepare.outputs.store_team_email }}"
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-production
+          path: /tmp/workflow-browser/workflow-production.png
+          if-no-files-found: ignore
+
+      - name: Cleanup temporary production fixtures
+        if: always()
+        run: |
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" "TEST_EMAIL='$TEST_EMAIL' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          docker compose exec -T -e TEST_EMAIL="$TEST_EMAIL" web python manage.py shell <<'PY'
+          import os
+          from django.contrib.auth import get_user_model
+          from core.models import Organization
+          email=os.environ['TEST_EMAIL']
+          Organization.objects.filter(name__startswith='Workflow Smoke ' + email.split('@')[0]).delete()
+          get_user_model().objects.filter(username=email).delete()
+          print('TEMP_WORKFLOW_FIXTURES_REMOVED')
+          PY
+          REMOTE
