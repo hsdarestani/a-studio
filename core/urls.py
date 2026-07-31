@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, workflow_views
 
 urlpatterns = [
     path("", views.landing, name="landing"),
@@ -8,12 +8,13 @@ urlpatterns = [
     path("projects/new/", views.project_create, name="project_create"),
     path("projects/<uuid:pk>/", views.project_detail, name="project_detail"),
     path("projects/<uuid:pk>/status/", views.project_status, name="project_status"),
-    path("projects/<uuid:pk>/chat/", views.chat_submit, name="chat_submit"),
-    path("projects/<uuid:pk>/messages/<uuid:message_id>/", views.message_status, name="message_status"),
+    path("projects/<uuid:pk>/chat/", workflow_views.chat_submit, name="chat_submit"),
+    path("projects/<uuid:pk>/messages/<uuid:message_id>/", workflow_views.message_status, name="message_status"),
     path("projects/<uuid:pk>/publish/", views.publish_project, name="publish_project"),
     path("projects/<uuid:pk>/spec/", views.export_spec, name="export_spec"),
     path("projects/<uuid:pk>/download/", views.download_build, name="download_build"),
-    path("projects/<uuid:pk>/store-submission/", views.request_store_submission, name="request_store_submission"),
+    path("projects/<uuid:pk>/store-submission/", workflow_views.request_store_submission, name="request_store_submission"),
+    path("projects/<uuid:pk>/store-submissions/", workflow_views.store_submissions, name="store_submissions"),
     path("billing/", views.billing, name="billing"),
     path("api/tls/allow/", views.tls_allow, name="tls_allow"),
 ]
