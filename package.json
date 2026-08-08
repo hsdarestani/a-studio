@@ -1,0 +1,22 @@
+{
+  "name": "a-plus-studio-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native Capacitor client for A+ Studio.",
+  "scripts": {
+    "native:sync": "npx cap sync",
+    "native:assets": "npx @capacitor/assets generate",
+    "native:android": "bash scripts/build-android.sh",
+    "native:ios": "bash scripts/build-ios.sh",
+    "store:check": "python3 scripts/store_positioning_check.py"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.0.0"
+  }
+}
