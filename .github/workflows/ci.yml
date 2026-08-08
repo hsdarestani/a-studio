@@ -48,3 +48,40 @@ jobs:
           cp .env.example .env
           docker compose config --quiet
           docker build --tag a-studio:ci .
+
+  mobile-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android API 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Install native dependencies
+        run: npm install --no-audit --no-fund
+      - name: Static native checks
+        run: |
+          python3 scripts/store_positioning_check.py
+          node --check www/app.js
+          bash -n scripts/build-android.sh
+          bash -n scripts/build-ios.sh
+      - name: Generate Capacitor Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+          APP_VERSION_NAME=1.0.0 APP_BUILD_NUMBER=1 python3 scripts/configure_android_release.py
+          npx @capacitor/assets generate --android \
+            --iconBackgroundColor '#0b0c0f' \
+            --iconBackgroundColorDark '#0b0c0f' \
+            --splashBackgroundColor '#0b0c0f' \
+            --splashBackgroundColorDark '#0b0c0f' \
+            --logoSplashScale 0.34
+      - name: Compile Android debug package
+        run: cd android && ./gradlew --no-daemon assembleDebug
