@@ -1,0 +1,28 @@
+{% extends "legal/base_legal.html" %}
+{% block title %}Konto löschen · A+ Studio{% endblock %}
+{% block content %}
+<div class="eyebrow">KONTO & DATEN</div>
+<h1>A+ Studio Konto löschen</h1>
+<p>Hier können Sie die Löschung Ihres A+ Studio Kontos und der damit verbundenen personenbezogenen Daten einleiten.</p>
+<div class="notice">Die Löschung ist dauerhaft. Persönliche Single-User-Workspaces werden inklusive Projekten entfernt. Bei gemeinsam genutzten Unternehmens-Workspaces wird die Verantwortung an ein anderes Mitglied übertragen und Ihr Personenbezug entfernt. Gesetzlich erforderliche Nachweise können im notwendigen Umfang erhalten bleiben.</div>
+
+{% if request.user.is_authenticated %}
+<div class="card">
+  <h2>Direkte Löschung</h2>
+  <p>Sie sind als <strong>{{ request.user.email }}</strong> angemeldet.</p>
+  <form method="post">{% csrf_token %}
+    <label>Zur Bestätigung DELETE eingeben<input name="confirmation" autocomplete="off" required></label>
+    <button class="btn danger" type="submit">Konto dauerhaft löschen</button>
+  </form>
+</div>
+{% else %}
+<div class="card">
+  <h2>Löschung ohne App-Zugriff anfordern</h2>
+  <p>Wenn Sie die App nicht mehr installiert haben oder sich nicht anmelden können, senden Sie hier eine Löschanfrage. Wir prüfen die Identität, bevor Daten eines Kontos gelöscht werden.</p>
+  <form method="post">{% csrf_token %}
+    <label>E-Mail-Adresse des A+ Studio Kontos<input type="email" name="email" autocomplete="email" required></label>
+    <button class="btn" type="submit">Löschung anfordern</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

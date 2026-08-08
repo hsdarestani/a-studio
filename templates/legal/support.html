@@ -1,0 +1,14 @@
+{% extends "legal/base_legal.html" %}
+{% block title %}Support · A+ Studio{% endblock %}
+{% block content %}
+<div class="eyebrow">SUPPORT</div>
+<h1>Wir helfen bei A+ Studio.</h1>
+<p>Für Login-Probleme, Builder-Fehler, Publishing-Fragen oder Datenschutzanliegen erreichen Sie das A+ Team unter <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
+<div class="card">
+  <h2>Für eine schnelle Bearbeitung</h2>
+  <p>Nennen Sie bitte die E-Mail-Adresse Ihres Kontos, den Projektnamen und – falls vorhanden – eine kurze Beschreibung des Fehlers. Senden Sie niemals Passwörter, API-Schlüssel, Store-Credentials oder vollständige Zahlungsdaten per E-Mail.</p>
+  <a class="btn" href="mailto:{{ contact_email }}?subject=A%2B%20Studio%20Support">Support kontaktieren</a>
+</div>
+<h2>Kontolöschung</h2>
+<p>Eine Kontolöschung kann direkt in der A+ Studio Mobile-App oder über die <a href="/account-deletion/">öffentliche Löschseite</a> gestartet werden.</p>
+{% endblock %}
