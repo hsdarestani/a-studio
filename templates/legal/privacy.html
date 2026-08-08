@@ -1,0 +1,41 @@
+{% extends "legal/base_legal.html" %}
+{% block title %}Datenschutz · A+ Studio{% endblock %}
+{% block content %}
+<div class="eyebrow">DATENSCHUTZ</div>
+<h1>Datenschutzerklärung für A+ Studio</h1>
+<p>Stand: 9. August 2026. Diese Erklärung beschreibt die Verarbeitung personenbezogener Daten in der A+ Studio Web- und Mobile-Anwendung.</p>
+
+<div class="card">
+  <h2>Verantwortlicher</h2>
+  <p>{{ company_name }}<br>E-Mail: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+</div>
+
+<h2>Welche Daten wir verarbeiten</h2>
+<ul>
+  <li><strong>Konto- und Profildaten:</strong> E-Mail-Adresse, Name, Unternehmensname, Login- und Sicherheitsinformationen.</li>
+  <li><strong>Projekt- und Nutzerdaten:</strong> App-Beschreibungen, Anforderungen, Chat-Nachrichten, generierte App-Spezifikationen, Projektstatus und Veröffentlichungsinformationen.</li>
+  <li><strong>Technische Daten:</strong> notwendige Server-, Sicherheits- und Fehlerprotokolle, Zeitstempel sowie für den sicheren Betrieb erforderliche IP-Informationen.</li>
+  <li><strong>Abrechnungsdaten:</strong> soweit kostenpflichtige Leistungen über die Web-Anwendung gebucht werden, verarbeiten wir Plan-, Transaktions- und Zahlungsreferenzen. Vollständige Kartendaten werden nicht in A+ Studio gespeichert.</li>
+</ul>
+
+<h2>Zwecke der Verarbeitung</h2>
+<p>Wir verwenden die Daten zur Bereitstellung und Absicherung des Kontos, zur Generierung und Änderung von Apps, für Preview- und Produktions-Builds, für Support, Missbrauchsprävention, Abrechnung sowie – nur auf ausdrückliche Nutzeraktion – zur Vorbereitung von Store-Veröffentlichungen und GitHub-Repositories.</p>
+
+<h2>Auftragsverarbeiter und Empfänger</h2>
+<p>Für einzelne Funktionen können sorgfältig ausgewählte Dienstleister eingesetzt werden. Dazu gehören insbesondere Hosting-/Infrastruktur-Anbieter, OpenAI für die Verarbeitung von Builder-Anfragen, GitHub für ausdrücklich aktivierte Repository-Funktionen, Stripe für webbasierte Zahlungsabwicklung sowie Apple und Google, wenn eine Store-Veröffentlichung beauftragt wird. Es werden nur die für den jeweiligen Zweck erforderlichen Daten übermittelt.</p>
+
+<h2>Speicherdauer</h2>
+<p>Kontodaten und projektbezogene Inhalte werden grundsätzlich solange gespeichert, wie das Konto oder der jeweilige Dienst benötigt wird. Bei Kontolöschung löschen wir das Konto und zugehörige personenbezogene Daten, soweit keine gesetzlichen Aufbewahrungspflichten, Sicherheits-, Betrugspräventions- oder Nachweispflichten entgegenstehen. Unternehmensdaten in gemeinsam genutzten Workspaces können nach Übertragung an ein anderes Mitglied erhalten bleiben; der Personenbezug des gelöschten Kontos wird entfernt.</p>
+
+<h2>Ihre Rechte</h2>
+<p>Sie können Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und – soweit einschlägig – Widerspruch verlangen. Für Datenschutzanfragen nutzen Sie bitte <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>. Eine Kontolöschung kann direkt in der mobilen App oder über unsere <a href="/account-deletion/">öffentliche Löschseite</a> eingeleitet werden.</p>
+
+<h2>Sicherheit und Übertragung</h2>
+<p>A+ Studio verwendet HTTPS für die Datenübertragung und trennt Server-Geheimnisse von generierten Apps. Zugangsdaten und Store-Credentials werden nicht in öffentlich ausgelieferten App-Dateien gespeichert.</p>
+
+<h2>Tracking</h2>
+<p>Die A+ Studio Mobile-App enthält in Version 1.0 keine Werbe-SDKs und kein Cross-App-Tracking. Sollte sich dies ändern, werden diese Erklärung und die Store-Datenschutzangaben vor der Veröffentlichung aktualisiert.</p>
+
+<h2>Änderungen</h2>
+<p>Wir aktualisieren diese Erklärung, wenn Funktionen, Rechtslage oder eingesetzte Dienstleister dies erfordern. Die aktuelle Fassung ist stets unter dieser URL verfügbar.</p>
+{% endblock %}

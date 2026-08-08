@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>{% block title %}A+ Studio{% endblock %}</title>
+  <style>
+    :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f4f2ea;background:#0b0c0f;--muted:#a0a5ad;--gold:#e3c66f;--panel:#17191e;--line:rgba(255,255,255,.1)}
+    *{box-sizing:border-box}body{margin:0;background:#0b0c0f;color:#f4f2ea}a{color:var(--gold)}.wrap{width:min(100% - 32px,860px);margin:0 auto}.top{padding:22px 0;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:white}.mark{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-weight:800;color:#17130b;background:linear-gradient(145deg,#f5dc91,#b98d32)}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}.nav{display:flex;flex-wrap:wrap;gap:16px;margin-top:15px;font-size:13px}.nav a{color:var(--muted);text-decoration:none}.main{padding:50px 0 80px}.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--gold);font-weight:700}h1{font-size:clamp(34px,8vw,58px);line-height:1.02;letter-spacing:-.045em;margin:10px 0 18px}h2{margin-top:34px;font-size:22px}h3{margin-top:24px}p,li{color:#c2c5cb;line-height:1.65}.card{margin:22px 0;padding:22px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}.notice{padding:14px 16px;border-radius:14px;background:rgba(227,198,111,.08);border:1px solid rgba(227,198,111,.2)}label{display:grid;gap:7px;margin:15px 0;font-weight:650;font-size:13px}input{width:100%;padding:14px 15px;border:1px solid var(--line);border-radius:13px;color:white;background:#0f1115}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;border:0;border-radius:13px;padding:12px 16px;font-weight:750;color:#17130b;background:linear-gradient(135deg,#f0d581,#c49a3e);cursor:pointer}.danger{color:white;background:#7d2c2a}.messages{list-style:none;padding:0}.messages li{padding:12px 14px;border-radius:12px;background:#34211f}.footer{padding:28px 0;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/"><span class="mark">A+</span><span><b>A+ Studio</b><small>AI Software Factory</small></span></a>
+  <nav class="nav">
+    <a href="/privacy/">Datenschutz</a>
+    <a href="/terms/">Nutzungsbedingungen</a>
+    <a href="/support/">Support</a>
+    <a href="/account-deletion/">Konto löschen</a>
+  </nav>
+</div></header>
+<main class="main"><div class="wrap">
+  {% if messages %}<ul class="messages">{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>{% endif %}
+  {% block content %}{% endblock %}
+</div></main>
+<footer class="footer"><div class="wrap">© 2026 {{ company_name }} · {{ app_name }} · <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></div></footer>
+</body>
+</html>

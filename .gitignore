@@ -10,3 +10,10 @@ media/
 .pytest_cache/
 coverage.xml
 htmlcov/
+
+# Generated native projects and store build outputs
+node_modules/
+android/
+ios/
+artifacts/
+build/

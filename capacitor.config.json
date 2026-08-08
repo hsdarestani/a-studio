@@ -1,0 +1,20 @@
+{
+  "appId": "de.aplussolution.studio",
+  "appName": "A+ Studio",
+  "webDir": "www",
+  "loggingBehavior": "none",
+  "backgroundColor": "#0b0c0f",
+  "zoomEnabled": false,
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#0b0c0f"
+  },
+  "ios": {
+    "preferredContentMode": "mobile",
+    "allowsLinkPreview": false,
+    "webContentsDebuggingEnabled": false,
+    "contentInset": "automatic",
+    "backgroundColor": "#0b0c0f"
+  }
+}
