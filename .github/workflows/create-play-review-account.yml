@@ -1,0 +1,141 @@
+name: Create Play reviewer account
+
+on:
+  push:
+    branches: [agent/create-play-review-account]
+    paths:
+      - '.github/workflows/create-play-review-account.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Generate reviewer credentials
+        id: creds
+        shell: bash
+        run: |
+          set -euo pipefail
+          REVIEW_EMAIL='play-review@studio.aplus-solution.de'
+          REVIEW_PASSWORD="$(python - <<'PY'
+          import secrets, string
+          alphabet = string.ascii_letters + string.digits
+          print('ASr!' + ''.join(secrets.choice(alphabet) for _ in range(20)))
+          PY
+          )"
+          echo "::add-mask::$REVIEW_PASSWORD"
+          {
+            echo "REVIEW_EMAIL=$REVIEW_EMAIL"
+            echo "REVIEW_PASSWORD=$REVIEW_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Create or reset reviewer account on production
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          email_b64="$(printf '%s' "$REVIEW_EMAIL" | base64 -w0)"
+          password_b64="$(printf '%s' "$REVIEW_PASSWORD" | base64 -w0)"
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+            "REVIEW_EMAIL_B64='$email_b64' REVIEW_PASSWORD_B64='$password_b64' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          export REVIEW_EMAIL="$(printf '%s' "$REVIEW_EMAIL_B64" | base64 -d)"
+          export REVIEW_PASSWORD="$(printf '%s' "$REVIEW_PASSWORD_B64" | base64 -d)"
+          docker compose exec -T \
+            -e REVIEW_EMAIL="$REVIEW_EMAIL" \
+            -e REVIEW_PASSWORD="$REVIEW_PASSWORD" \
+            web python manage.py shell <<'PY'
+          import os
+          from django.contrib.auth import get_user_model
+          from core.models import CreditTransaction, Membership, Organization
+
+          User = get_user_model()
+          email = os.environ['REVIEW_EMAIL'].strip().lower()
+          password = os.environ['REVIEW_PASSWORD']
+
+          user = User.objects.filter(email__iexact=email).first()
+          created = user is None
+          if user is None:
+              user = User(username=email, email=email)
+          user.username = email
+          user.email = email
+          user.first_name = 'Google Play'
+          user.last_name = 'Reviewer'
+          user.is_active = True
+          user.set_password(password)
+          user.save()
+
+          membership = Membership.objects.select_related('organization').filter(user=user).first()
+          if membership:
+              organization = membership.organization
+          else:
+              organization = Organization.objects.create(
+                  name='A+ Studio Review',
+                  owner=user,
+                  billing_email=email,
+                  credits=20,
+              )
+              Membership.objects.create(organization=organization, user=user, role='owner')
+              CreditTransaction.objects.create(
+                  organization=organization,
+                  kind='grant',
+                  amount=20,
+                  balance_after=20,
+                  description='Google Play review credits',
+              )
+
+          print('review_account=ready')
+          print('created=' + ('yes' if created else 'no'))
+          print('workspace=' + organization.name)
+          PY
+          REMOTE
+
+      - name: Verify public mobile login
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(python - <<'PY'
+          import json, os
+          print(json.dumps({'email': os.environ['REVIEW_EMAIL'], 'password': os.environ['REVIEW_PASSWORD']}))
+          PY
+          )"
+          response="$(curl -4 -fsS --connect-timeout 15 --max-time 30 \
+            -H 'Content-Type: application/json' \
+            -d "$payload" \
+            https://studio.aplus-solution.de/api/mobile/login/)"
+          python - "$response" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])
+          if not data.get('ok') or not data.get('token'):
+              raise SystemExit('Reviewer login verification failed')
+          print('public_login=verified')
+          PY
+
+      - name: Save reviewer credentials artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          {
+            printf 'Email: %s\n' "$REVIEW_EMAIL"
+            printf 'Password: %s\n' "$REVIEW_PASSWORD"
+            printf 'Instructions: Sign in with this dedicated Google Play review account. No purchase or 2FA is required.\n'
+          } > review-credentials.txt
+
+      - name: Upload reviewer credentials
+        uses: actions/upload-artifact@v4
+        with:
+          name: a-studio-play-review-credentials
+          path: review-credentials.txt
+          retention-days: 1
