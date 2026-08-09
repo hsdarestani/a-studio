@@ -27,6 +27,30 @@ if [ ! -d ios ]; then
 fi
 npx cap sync ios
 
+# A+ Studio's canonical store icon is assets/appicon.png. Capacitor Assets looks
+# for assets/icon.*; temporarily expose the canonical PNG as icon.png and hide
+# the legacy SVG so the generated native AppIcon set is guaranteed to use the
+# exact artwork committed by the product owner.
+APPICON_SOURCE="$ROOT/assets/appicon.png"
+ICON_PNG="$ROOT/assets/icon.png"
+ICON_SVG="$ROOT/assets/icon.svg"
+ICON_SVG_BACKUP="$ROOT/assets/.icon.svg.publisher-backup"
+restore_icon_sources() {
+  rm -f "$ICON_PNG"
+  if [ -f "$ICON_SVG_BACKUP" ]; then
+    mv "$ICON_SVG_BACKUP" "$ICON_SVG"
+  fi
+}
+trap restore_icon_sources EXIT
+if [ ! -f "$APPICON_SOURCE" ]; then
+  echo "Canonical iOS icon is missing: $APPICON_SOURCE" >&2
+  exit 4
+fi
+if [ -f "$ICON_SVG" ]; then
+  mv "$ICON_SVG" "$ICON_SVG_BACKUP"
+fi
+cp "$APPICON_SOURCE" "$ICON_PNG"
+
 npx @capacitor/assets generate --ios \
   --iconBackgroundColor '#0b0c0f' \
   --iconBackgroundColorDark '#0b0c0f' \
@@ -34,10 +58,13 @@ npx @capacitor/assets generate --ios \
   --splashBackgroundColorDark '#0b0c0f' \
   --logoSplashScale 0.34
 
+restore_icon_sources
+trap - EXIT
+
 APPICON_SET="$ROOT/ios/App/App/Assets.xcassets/AppIcon.appiconset"
 if [ ! -d "$APPICON_SET" ] || [ ! -f "$APPICON_SET/Contents.json" ]; then
   echo "iOS AppIcon asset catalog was not generated." >&2
-  exit 4
+  exit 5
 fi
 
 PRIVACY_MANIFEST="$ROOT/ios/App/App/PrivacyInfo.xcprivacy"
@@ -71,7 +98,7 @@ elif [ -d ios/App/App.xcodeproj ]; then
   XCODE_CONTAINER=(-project ios/App/App.xcodeproj)
 else
   echo "No generated iOS Xcode project exists after cap sync." >&2
-  exit 5
+  exit 6
 fi
 
 XCODE_ARGS=(
@@ -95,7 +122,7 @@ fi
 if [ "$SIGNING_STYLE" = "Manual" ]; then
   if [ -z "$PROFILE_SPECIFIER" ] || [ -z "$SIGNING_KEYCHAIN" ]; then
     echo "Manual iOS signing requires Publisher provisioning profile and keychain." >&2
-    exit 6
+    exit 7
   fi
   XCODE_ARGS+=(
     CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY"
@@ -169,7 +196,7 @@ xcodebuild "${EXPORT_ARGS[@]}"
 IPA="$(find "$EXPORT_DIR" -name '*.ipa' -type f | head -n 1)"
 if [ -z "$IPA" ]; then
   echo "No IPA was produced." >&2
-  exit 7
+  exit 8
 fi
 cp "$IPA" artifacts/a-studio.ipa
 
