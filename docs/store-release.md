@@ -25,10 +25,17 @@ Apps mit AI bauen
 **Google short description**  
 Apps mit AI planen, als Preview testen und mit A+ professionell veröffentlichen.
 
-**Description**  
+**Apple description**  
 A+ Studio ist die mobile AI Software Factory von A+ Solution. Beschreiben Sie Ihre App-Idee, erstellen Sie einen ersten Preview-Build und verbessern Sie das Produkt direkt im AI Builder.
 
-Verwalten Sie Projekte, verfolgen Sie Build-Status und Versionen, öffnen Sie Previews und starten Sie nach Ihrer Freigabe die Veröffentlichung. Für Projekte, die in Apple App Store oder Google Play erscheinen sollen, können Sie den A+ Store-Publishing-Prozess direkt aus dem Projekt anstoßen.
+Verwalten Sie Projekte, verfolgen Sie Build-Status und Versionen, öffnen Sie Previews und starten Sie nach Ihrer Freigabe die Veröffentlichung. Wenn Sie Ihre App im App Store veröffentlichen möchten, können Sie den A+ Store-Publishing-Prozess direkt aus dem Projekt anstoßen.
+
+Die mobile App konzentriert sich auf den produktiven Builder-Workflow: Konto, Projekte, AI-Änderungen, Preview, Publishing und Store-Anfragen. Digitale Käufe oder externe Zahlungslinks sind in Version 1.0 bewusst nicht Bestandteil der mobilen App.
+
+**Google Play description**  
+A+ Studio ist die mobile AI Software Factory von A+ Solution. Beschreiben Sie Ihre App-Idee, erstellen Sie einen ersten Preview-Build und verbessern Sie das Produkt direkt im AI Builder.
+
+Verwalten Sie Projekte, verfolgen Sie Build-Status und Versionen, öffnen Sie Previews und starten Sie nach Ihrer Freigabe die Veröffentlichung. Wenn Sie Ihre App bei Google Play veröffentlichen möchten, können Sie den A+ Store-Publishing-Prozess direkt aus dem Projekt anstoßen.
 
 Die mobile App konzentriert sich auf den produktiven Builder-Workflow: Konto, Projekte, AI-Änderungen, Preview, Publishing und Store-Anfragen. Digitale Käufe oder externe Zahlungslinks sind in Version 1.0 bewusst nicht Bestandteil der mobilen App.
 
