@@ -98,7 +98,18 @@ fi
 
 (
   cd android
-  ./gradlew --no-daemon clean bundleRelease
+  for attempt in 1 2 3; do
+    if ./gradlew --no-daemon clean bundleRelease; then
+      exit 0
+    fi
+    if [ "$attempt" -ge 3 ]; then
+      echo "Gradle release build failed after $attempt attempts." >&2
+      exit 1
+    fi
+    echo "Gradle release build attempt $attempt failed; retrying after cleaning the wrapper download cache..." >&2
+    rm -rf "$HOME/.gradle/wrapper/dists/gradle-8.14.3-all" 2>/dev/null || true
+    sleep $((attempt * 8))
+  done
 )
 
 AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' -type f | head -n 1)"
