@@ -79,16 +79,8 @@ jobs:
           node --check www/app.js
           bash -n scripts/build-android.sh
           bash -n scripts/build-ios.sh
-      - name: Generate Capacitor Android project
-        run: |
-          npx cap add android
-          npx cap sync android
-          APP_VERSION_NAME=1.0.0 APP_BUILD_NUMBER=1 python3 scripts/configure_android_release.py
-          npx @capacitor/assets generate --android \
-            --iconBackgroundColor '#0b0c0f' \
-            --iconBackgroundColorDark '#0b0c0f' \
-            --splashBackgroundColor '#0b0c0f' \
-            --splashBackgroundColorDark '#0b0c0f' \
-            --logoSplashScale 0.34
-      - name: Compile Android debug package
-        run: cd android && ./gradlew --no-daemon assembleDebug
+      - name: Build production-path Android bundle
+        env:
+          APP_VERSION_NAME: 1.0.0
+          APP_BUILD_NUMBER: 2
+        run: bash scripts/build-android.sh
