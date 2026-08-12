@@ -9,7 +9,10 @@ if not build_gradle.exists():
     raise SystemExit("android/app/build.gradle not found; run npx cap add android first")
 
 version_name = (os.environ.get("APP_VERSION_NAME") or os.environ.get("APP_VERSION") or "1.0.0").strip()
-build_raw = (os.environ.get("APP_BUILD_NUMBER") or os.environ.get("BUILD_NUMBER") or "1").strip()
+# Google Play already has the first Android release. Default to versionCode 2
+# for the launcher-icon correction while still allowing Publisher/CI to supply
+# any later build number explicitly through APP_BUILD_NUMBER/BUILD_NUMBER.
+build_raw = (os.environ.get("APP_BUILD_NUMBER") or os.environ.get("BUILD_NUMBER") or "2").strip()
 try:
     build_number = int(build_raw)
 except ValueError as exc:
