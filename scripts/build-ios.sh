@@ -25,7 +25,68 @@ fi
 if [ ! -d ios ]; then
   npx cap add ios
 fi
+
+# App Review guideline 2.3.10 requires the iOS binary itself to avoid references
+# to competing distribution platforms. The shared mobile source also powers the
+# separate non-iOS build, so prepare an iOS-only copy for `cap sync`, then put
+# the shared source back immediately afterwards.
+IOS_APP_JS="$ROOT/www/app.js"
+IOS_APP_JS_BACKUP="$ROOT/www/.app.js.publisher-ios-backup"
+restore_ios_web() {
+  if [ -f "$IOS_APP_JS_BACKUP" ]; then
+    mv "$IOS_APP_JS_BACKUP" "$IOS_APP_JS"
+  fi
+}
+trap restore_ios_web EXIT
+mv "$IOS_APP_JS" "$IOS_APP_JS_BACKUP"
+cp "$IOS_APP_JS_BACKUP" "$IOS_APP_JS"
+python3 - "$IOS_APP_JS" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+text = text.replace(
+    "Nach Freigabe prüft A+ Metadaten, Signierung und Store-Compliance für Google Play und den App Store.",
+    "Nach Freigabe prüft A+ Metadaten, Signierung und Store-Compliance für die Veröffentlichung im App Store.",
+)
+
+start_marker = '      <section class="card">\n        <div class="section-head"><h2>Store Publishing</h2>'
+end_marker = '      </section>\n    `, "projects");'
+start = text.find(start_marker)
+end = text.find(end_marker, start)
+if start < 0 or end < 0:
+    raise SystemExit("Could not locate native store-publishing section for iOS sanitization")
+end += len('      </section>\n')
+replacement = '''      <section class="card">
+        <div class="section-head"><h2>App Store Publishing</h2><span class="pill">Managed</span></div>
+        <p>A+ prüft App-Qualität, Developer-Account, Metadaten und App-Store-Compliance vor der Einreichung.</p>
+        ${project.store_submissions.length ? `
+          <div class="submission-list">${project.store_submissions.map((item) => `
+            <div><b>Apple App Store</b><span>${escapeHtml(statusLabel(item.status))}</span></div>
+          `).join("")}</div>` : ""}
+        <div class="actions">
+          <button class="btn primary" data-store="ios">App Store Publishing anfragen</button>
+        </div>
+      </section>
+'''
+text = text[:start] + replacement + text[end:]
+
+path.write_text(text, encoding="utf-8")
+
+for candidate in (Path("www/index.html"), Path("www/app.js"), Path("www/app.css")):
+    payload = candidate.read_text(encoding="utf-8").lower()
+    for forbidden in ("google", "android", "play store"):
+        if forbidden in payload:
+            raise SystemExit(f"iOS native web bundle still contains forbidden third-party platform reference {forbidden!r} in {candidate}")
+
+print("iOS native web bundle sanitized for App Store review.")
+PY
+
 npx cap sync ios
+restore_ios_web
+trap - EXIT
 
 # A+ Studio's canonical store icon is assets/appicon.png. Capacitor Assets looks
 # for assets/icon.*; temporarily expose the canonical PNG as icon.png and hide
