@@ -1,0 +1,318 @@
+name: Create Apple reviewer account
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/create-apple-review-account.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Generate reviewer credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          REVIEW_EMAIL='app-review@studio.aplus-solution.de'
+          REVIEW_PASSWORD="$(python - <<'PY'
+          import secrets, string
+          alphabet = string.ascii_letters + string.digits
+          print('ASa!' + ''.join(secrets.choice(alphabet) for _ in range(22)))
+          PY
+          )"
+          echo "::add-mask::$REVIEW_PASSWORD"
+          {
+            echo "REVIEW_EMAIL=$REVIEW_EMAIL"
+            echo "REVIEW_PASSWORD=$REVIEW_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Create reviewer account and pre-populated project
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          email_b64="$(printf '%s' "$REVIEW_EMAIL" | base64 -w0)"
+          password_b64="$(printf '%s' "$REVIEW_PASSWORD" | base64 -w0)"
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+            "REVIEW_EMAIL_B64='$email_b64' REVIEW_PASSWORD_B64='$password_b64' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/a-studio/current
+          export REVIEW_EMAIL="$(printf '%s' "$REVIEW_EMAIL_B64" | base64 -d)"
+          export REVIEW_PASSWORD="$(printf '%s' "$REVIEW_PASSWORD_B64" | base64 -d)"
+          docker compose exec -T \
+            -e REVIEW_EMAIL="$REVIEW_EMAIL" \
+            -e REVIEW_PASSWORD="$REVIEW_PASSWORD" \
+            web python manage.py shell <<'PY'
+          import os
+          from django.contrib.auth import get_user_model
+          from django.utils import timezone
+          from core.models import (
+              Conversation,
+              CreditTransaction,
+              Deployment,
+              Membership,
+              Message,
+              Organization,
+              Project,
+              StoreSubmission,
+          )
+          from core.services.ai import initial_spec, sanitize_spec
+          from core.services.generator import generate_preview
+
+          User = get_user_model()
+          email = os.environ['REVIEW_EMAIL'].strip().lower()
+          password = os.environ['REVIEW_PASSWORD']
+
+          user = User.objects.filter(email__iexact=email).first()
+          if user is None:
+              user = User(username=email, email=email)
+          user.username = email
+          user.email = email
+          user.first_name = 'App'
+          user.last_name = 'Reviewer'
+          user.is_active = True
+          user.set_password(password)
+          user.save()
+
+          membership = Membership.objects.select_related('organization').filter(user=user).first()
+          if membership:
+              organization = membership.organization
+          else:
+              organization = Organization.objects.create(
+                  name='A+ Studio App Review',
+                  owner=user,
+                  billing_email=email,
+                  plan='pro',
+                  credits=50,
+              )
+              Membership.objects.create(organization=organization, user=user, role='owner')
+
+          organization.name = 'A+ Studio App Review'
+          organization.owner = user
+          organization.billing_email = email
+          organization.plan = 'pro'
+          organization.credits = 50
+          organization.active = True
+          organization.save()
+
+          # Keep the dedicated review workspace deterministic on every run.
+          organization.projects.all().delete()
+          CreditTransaction.objects.filter(organization=organization).delete()
+          CreditTransaction.objects.create(
+              organization=organization,
+              kind='grant',
+              amount=50,
+              balance_after=50,
+              description='App Review test credits',
+          )
+
+          description = (
+              'Termin- und Kunden-App für einen lokalen Salon mit Services, '
+              'Buchungsablauf, Bewertungen und Kontaktbereich.'
+          )
+          spec = initial_spec('Luna Booking', 'Friseursalon', description, 'de')
+          spec['features'] = ['booking', 'services', 'testimonials', 'contact']
+          spec['navigation'] = ['home', 'services', 'booking', 'contact']
+          spec['sections'] = [
+              {
+                  'type': 'hero',
+                  'title': 'Luna Booking',
+                  'text': 'Termine einfach finden, Leistungen vergleichen und direkt anfragen.',
+                  'button': 'Termin finden',
+              },
+              {
+                  'type': 'services',
+                  'title': 'Beliebte Leistungen',
+                  'items': [
+                      {'title': 'Cut & Style', 'text': 'Beratung, Schnitt und Styling.'},
+                      {'title': 'Color Refresh', 'text': 'Farbauffrischung mit persönlicher Beratung.'},
+                      {'title': 'Event Styling', 'text': 'Styling für besondere Anlässe.'},
+                  ],
+              },
+              {
+                  'type': 'booking',
+                  'title': 'Termin anfragen',
+                  'text': 'Wählen Sie Leistung und Wunschtermin. Das Team bestätigt anschließend den Termin.',
+              },
+              {
+                  'type': 'testimonials',
+                  'title': 'Kundenstimmen',
+                  'items': [
+                      {'title': 'Sophie', 'text': 'Sehr übersichtlich und schnell gebucht.'},
+                      {'title': 'Mara', 'text': 'Services und freie Termine sind sofort verständlich.'},
+                  ],
+              },
+              {
+                  'type': 'contact',
+                  'title': 'Kontakt',
+                  'phone': '+49 69 000000',
+                  'email': 'review-demo@aplus-solution.de',
+                  'address': 'Frankfurt am Main',
+              },
+          ]
+          spec = sanitize_spec(spec)
+
+          project = Project.objects.create(
+              organization=organization,
+              created_by=user,
+              name='Luna Booking',
+              business_type='Friseursalon',
+              description=description,
+              language='de',
+              status='preview',
+              app_spec=spec,
+              version=3,
+          )
+
+          conversation = Conversation.objects.create(
+              project=project,
+              summary='Pre-populated App Review conversation demonstrating the AI builder workflow.',
+          )
+          Message.objects.create(
+              conversation=conversation,
+              role='user',
+              status='done',
+              content='Erstelle eine moderne Termin-App für unseren Salon mit Services und Kontakt.',
+          )
+          Message.objects.create(
+              conversation=conversation,
+              role='assistant',
+              status='done',
+              content='Der erste Preview-Build ist fertig. Services, Kontakt und mobile Navigation sind enthalten.',
+              metadata={'preview_url': project.preview_url},
+          )
+          Message.objects.create(
+              conversation=conversation,
+              role='user',
+              status='done',
+              content='Füge eine klare Buchungssektion und Kundenstimmen hinzu.',
+          )
+          Message.objects.create(
+              conversation=conversation,
+              role='assistant',
+              status='done',
+              content='Erledigt. Version 3 enthält jetzt den Buchungsablauf und Kundenstimmen im Preview.',
+              metadata={'preview_url': project.preview_url},
+          )
+
+          preview_root, checksum = generate_preview(project)
+          Deployment.objects.create(
+              project=project,
+              environment='preview',
+              status='success',
+              version=project.version,
+              url=project.preview_url,
+              checksum=checksum,
+              deployed_at=timezone.now(),
+              log='Pre-populated App Review preview generated successfully.',
+          )
+          StoreSubmission.objects.create(
+              project=project,
+              requested_by=user,
+              platform='ios',
+              status='eligibility',
+              notes='Pre-populated App Store publishing example for App Review.',
+              eligibility_report={
+                  'has_pwa': True,
+                  'unique_content_review_required': True,
+                  'developer_accounts_required': True,
+                  'manual_a_plus_review': True,
+              },
+          )
+
+          print('review_account=ready')
+          print('workspace=' + organization.name)
+          print('project=' + project.name)
+          print('project_status=' + project.status)
+          print('preview=' + project.preview_url)
+          print('preview_root=' + str(preview_root))
+          print('messages=' + str(conversation.messages.count()))
+          PY
+          REMOTE
+
+      - name: Verify public mobile review flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(python - <<'PY'
+          import json, os
+          print(json.dumps({'email': os.environ['REVIEW_EMAIL'], 'password': os.environ['REVIEW_PASSWORD']}))
+          PY
+          )"
+          login_response="$(curl -4 -fsS --connect-timeout 15 --max-time 30 \
+            -H 'Content-Type: application/json' \
+            -d "$payload" \
+            https://studio.aplus-solution.de/api/mobile/login/)"
+          token="$(python - "$login_response" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])
+          if not data.get('ok') or not data.get('token'):
+              raise SystemExit('Reviewer login verification failed')
+          print(data['token'])
+          PY
+          )"
+          dashboard="$(curl -4 -fsS --connect-timeout 15 --max-time 30 \
+            -H "Authorization: Bearer $token" \
+            https://studio.aplus-solution.de/api/mobile/dashboard/)"
+          project_id="$(python - "$dashboard" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])
+          projects = data.get('projects') or []
+          if not data.get('ok') or not projects:
+              raise SystemExit('Reviewer dashboard has no pre-populated project')
+          project = projects[0]
+          if project.get('status') not in {'preview', 'live'}:
+              raise SystemExit('Reviewer project is not preview-ready')
+          print(project['id'])
+          PY
+          )"
+          detail="$(curl -4 -fsS --connect-timeout 15 --max-time 30 \
+            -H "Authorization: Bearer $token" \
+            "https://studio.aplus-solution.de/api/mobile/projects/$project_id/")"
+          python - "$detail" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])
+          project = data.get('project') or {}
+          if not data.get('ok'):
+              raise SystemExit('Reviewer project detail failed')
+          if len(project.get('messages') or []) < 4:
+              raise SystemExit('Reviewer project is missing pre-populated builder content')
+          if not project.get('preview_url'):
+              raise SystemExit('Reviewer project is missing preview URL')
+          print('public_review_flow=verified')
+          print('project=' + project.get('name', ''))
+          print('messages=' + str(len(project.get('messages') or [])))
+          PY
+
+      - name: Save reviewer credentials artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          {
+            printf 'Email: %s\n' "$REVIEW_EMAIL"
+            printf 'Password: %s\n' "$REVIEW_PASSWORD"
+            printf 'Workspace: A+ Studio App Review\n'
+            printf 'Pre-populated project: Luna Booking (Preview ready, version 3)\n'
+            printf 'Instructions: Sign in with this dedicated App Review account. No purchase, subscription, or 2FA is required. The workspace includes a ready preview and AI Builder conversation; reviewers may also create a new project and request App Store publishing.\n'
+          } > review-credentials.txt
+
+      - name: Upload reviewer credentials
+        uses: actions/upload-artifact@v4
+        with:
+          name: a-studio-apple-review-credentials
+          path: review-credentials.txt
+          retention-days: 7
