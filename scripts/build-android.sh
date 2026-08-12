@@ -36,12 +36,39 @@ fi
 npx cap sync android
 python3 scripts/configure_android_release.py
 
+# A+ Studio's canonical launcher/store icon is assets/appicon.png. Capacitor
+# Assets looks for assets/icon.*; temporarily expose the canonical PNG as
+# icon.png and hide the legacy SVG so Android mipmap/adaptive icons are always
+# generated from the exact same artwork shown in Google Play.
+APPICON_SOURCE="$ROOT/assets/appicon.png"
+ICON_PNG="$ROOT/assets/icon.png"
+ICON_SVG="$ROOT/assets/icon.svg"
+ICON_SVG_BACKUP="$ROOT/assets/.icon.svg.publisher-android-backup"
+restore_icon_sources() {
+  rm -f "$ICON_PNG"
+  if [ -f "$ICON_SVG_BACKUP" ]; then
+    mv "$ICON_SVG_BACKUP" "$ICON_SVG"
+  fi
+}
+trap restore_icon_sources EXIT
+if [ ! -f "$APPICON_SOURCE" ]; then
+  echo "Canonical Android icon is missing: $APPICON_SOURCE" >&2
+  exit 4
+fi
+if [ -f "$ICON_SVG" ]; then
+  mv "$ICON_SVG" "$ICON_SVG_BACKUP"
+fi
+cp "$APPICON_SOURCE" "$ICON_PNG"
+
 npx @capacitor/assets generate --android \
   --iconBackgroundColor '#0b0c0f' \
   --iconBackgroundColorDark '#0b0c0f' \
   --splashBackgroundColor '#0b0c0f' \
   --splashBackgroundColorDark '#0b0c0f' \
   --logoSplashScale 0.34
+
+restore_icon_sources
+trap - EXIT
 
 mkdir -p artifacts
 
@@ -77,7 +104,7 @@ fi
 AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' -type f | head -n 1)"
 if [ -z "$AAB" ]; then
   echo "No release AAB was produced." >&2
-  exit 4
+  exit 5
 fi
 cp "$AAB" artifacts/a-studio-release.aab
 
