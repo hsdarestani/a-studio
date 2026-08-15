@@ -38,11 +38,28 @@ required = [
     "https://studio.aplus-solution.de/api/mobile",
     "/account/delete/",
     "/projects/",
-    "/store-submission/",
+    "Projektbegleitung",
+    "Änderungswünsche",
+    "keinen Programmcode",
 ]
 for marker in required:
     if marker not in app_js:
-        raise SystemExit(f"Native client is missing required flow: {marker}")
+        raise SystemExit(f"Native companion client is missing required flow: {marker}")
+
+# Regression guard for the App Review 2.5.2 rejection: the distributed mobile
+# client must not regain the old generated-app preview/publish controls.
+for forbidden in (
+    "Preview öffnen",
+    "Preview erstellen",
+    "AI Builder",
+    "Live veröffentlichen",
+    "Kostenlos ausprobieren",
+    "Start-Credits",
+    "/store-submission/",
+    "/publish/",
+):
+    if forbidden in app_js:
+        raise SystemExit(f"App Store companion contains forbidden builder flow: {forbidden}")
 
 store_profile = store_profile_path.read_text(encoding="utf-8")
 
@@ -74,6 +91,24 @@ for forbidden in ("app store", "ios", "iphone", "ipad"):
     if forbidden in google_description:
         raise SystemExit(
             f"Google Play description must not reference Apple platform metadata: {forbidden}"
+        )
+
+for required_phrase in ("begleit-app", "projektkoordination"):
+    if required_phrase not in apple_description:
+        raise SystemExit(
+            f"Apple description must clearly position the product as a companion: {required_phrase}"
+        )
+
+for forbidden_phrase in (
+    "apps mit ai bauen",
+    "ersten preview-build",
+    "direkt im ai builder",
+    "preview öffnen",
+    "store-publishing-prozess direkt",
+):
+    if forbidden_phrase in apple_description:
+        raise SystemExit(
+            f"Apple description still contains rejected builder positioning: {forbidden_phrase}"
         )
 
 print("A+ Studio store positioning check passed.")
