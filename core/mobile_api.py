@@ -15,19 +15,22 @@ from django.views.decorators.csrf import csrf_exempt
 from .forms import ProjectCreateForm
 from .models import (
     Conversation,
-    CreditTransaction,
     FeatureRequest,
     Membership,
-    Message,
     Organization,
     Project,
     StoreSubmission,
 )
-from .tasks import process_chat_message, provision_initial_project, publish_project_task
 
 User = get_user_model()
 TOKEN_SALT = "a-studio-mobile-v1"
 TOKEN_MAX_AGE = 60 * 60 * 24 * 7
+
+
+# The App Store build is intentionally a project-companion client. It must not
+# generate, download, preview, publish, or execute app code. The full Studio
+# builder remains a separate web workflow.
+MOBILE_COMPANION_ERROR = "mobile_companion_only"
 
 
 def _json_body(request):
@@ -118,6 +121,7 @@ def _organization_for(user):
         name=f"{user.get_full_name() or user.email or user.username} workspace",
         owner=user,
         billing_email=user.email,
+        credits=0,
     )
     Membership.objects.create(organization=organization, user=user, role="owner")
     return organization
@@ -132,39 +136,27 @@ def _project_for(user, pk):
 
 
 def _project_payload(project, *, detail=False):
-    latest = project.deployments.order_by("-created_at").first()
+    # Do not expose preview/build/repository URLs to the App Store client.
+    # The mobile product is project coordination only.
     data = {
         "id": str(project.id),
         "name": project.name,
         "business_type": project.business_type,
         "language": project.language,
         "status": project.status,
-        "version": project.version,
-        "preview_url": project.preview_url,
-        "live_url": project.live_url,
-        "repo_url": project.repo_url,
-        "last_build_error": project.last_build_error,
         "updated_at": project.updated_at.isoformat(),
-        "deployment": {
-            "status": latest.status,
-            "environment": latest.environment,
-            "version": latest.version,
-            "url": latest.url,
-        } if latest else None,
     }
     if detail:
         data["description"] = project.description
-        conversation = Conversation.objects.filter(project=project).first()
-        messages = conversation.messages.order_by("-created_at")[:40] if conversation else []
-        data["messages"] = [
+        data["change_requests"] = [
             {
-                "id": str(message.id),
-                "role": message.role,
-                "content": message.content,
-                "status": message.status,
-                "created_at": message.created_at.isoformat(),
+                "id": str(item.id),
+                "title": item.title,
+                "description": item.description,
+                "status": item.status,
+                "created_at": item.created_at.isoformat(),
             }
-            for message in reversed(list(messages))
+            for item in project.feature_requests.order_by("-created_at")[:20]
         ]
         data["store_submissions"] = [
             {
@@ -239,16 +231,10 @@ def signup(request):
             name=company_name,
             owner=user,
             billing_email=email,
-            credits=20,
+            credits=0,
         )
         Membership.objects.create(organization=organization, user=user, role="owner")
-        CreditTransaction.objects.create(
-            organization=organization,
-            kind="grant",
-            amount=20,
-            balance_after=20,
-            description="Welcome credits",
-        )
+
     return JsonResponse(
         {"ok": True, "token": _issue_token(user), "user": _user_payload(user)},
         status=201,
@@ -264,8 +250,6 @@ def _user_payload(user):
         "organization": {
             "id": str(organization.id),
             "name": organization.name,
-            "plan": organization.plan,
-            "credits": organization.credits,
         },
     }
 
@@ -277,6 +261,15 @@ def config(request):
         "ok": True,
         "app": "A+ Studio",
         "version": "1.0.0",
+        "mode": "project_companion",
+        "capabilities": {
+            "project_coordination": True,
+            "change_requests": True,
+            "code_execution": False,
+            "preview_builds": False,
+            "mobile_publishing": False,
+            "mobile_purchases": False,
+        },
         "legal": {
             "privacy": f"{base}/privacy/",
             "terms": f"{base}/terms/",
@@ -297,34 +290,33 @@ def dashboard(request):
     projects = organization.projects.order_by("-updated_at")
     return JsonResponse({
         "ok": True,
-        "organization": {
-            "name": organization.name,
-            "plan": organization.plan,
-            "credits": organization.credits,
-        },
+        "organization": {"name": organization.name},
         "projects": [_project_payload(project) for project in projects],
     })
 
 
 @mobile_endpoint("POST", auth=True)
 def project_create(request):
+    """Create a project workspace only; do not generate or provision code."""
     organization = _organization_for(request.mobile_user)
     try:
         payload = _json_body(request)
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
     form = ProjectCreateForm(payload)
     if not form.is_valid():
         return JsonResponse(
             {"ok": False, "error": "invalid_project", "fields": form.errors.get_json_data()},
             status=400,
         )
+
     project = form.save(commit=False)
     project.organization = organization
     project.created_by = request.mobile_user
+    project.status = "draft"
     project.save()
-    Conversation.objects.create(project=project)
-    provision_initial_project.delay(str(project.id))
+    Conversation.objects.get_or_create(project=project)
     return JsonResponse({"ok": True, "project": _project_payload(project, detail=True)}, status=201)
 
 
@@ -338,6 +330,11 @@ def project_detail(request, pk):
 
 @mobile_endpoint("POST", auth=True)
 def chat(request, pk):
+    """Legacy route retained as a manual change-request endpoint.
+
+    It deliberately does not invoke AI, build tasks, preview provisioning, or
+    remote code execution. Requests are queued for human/project-team review.
+    """
     project = _project_for(request.mobile_user, pk)
     if not project:
         return JsonResponse({"ok": False, "error": "project_not_found"}, status=404)
@@ -345,95 +342,55 @@ def chat(request, pk):
         payload = _json_body(request)
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
     content = str(payload.get("message") or "").strip()
     if not content:
         return JsonResponse({"ok": False, "error": "message_required"}, status=400)
     if len(content) > 12000:
         return JsonResponse({"ok": False, "error": "message_too_long"}, status=400)
-    conversation, _ = Conversation.objects.get_or_create(project=project)
-    user_message = Message.objects.create(conversation=conversation, role="user", content=content)
-    assistant = Message.objects.create(
-        conversation=conversation,
-        role="assistant",
-        content="Working on your request…",
-        status="queued",
+
+    title = content.splitlines()[0].strip()[:220] or "Change request"
+    item = FeatureRequest.objects.create(
+        project=project,
+        requested_by=request.mobile_user,
+        title=title,
+        description=content,
+        size="custom",
+        credits=0,
+        status="proposed",
     )
-    task = process_chat_message.delay(str(user_message.id), str(assistant.id), request.mobile_user.id)
-    assistant.task_id = task.id
-    assistant.save(update_fields=["task_id", "updated_at"])
     return JsonResponse(
-        {"ok": True, "assistant_message_id": str(assistant.id), "task_id": task.id},
-        status=202,
+        {
+            "ok": True,
+            "request": {
+                "id": str(item.id),
+                "title": item.title,
+                "status": item.status,
+                "created_at": item.created_at.isoformat(),
+            },
+        },
+        status=201,
     )
 
 
 @mobile_endpoint("GET", auth=True)
 def message_status(request, pk, message_id):
-    project = _project_for(request.mobile_user, pk)
-    if not project:
-        return JsonResponse({"ok": False, "error": "project_not_found"}, status=404)
-    message = Message.objects.filter(pk=message_id, conversation__project=project).first()
-    if not message:
-        return JsonResponse({"ok": False, "error": "message_not_found"}, status=404)
-    project.refresh_from_db()
-    return JsonResponse({
-        "ok": True,
-        "message": {
-            "id": str(message.id),
-            "status": message.status,
-            "content": message.content,
-            "metadata": message.metadata,
-        },
-        "project": _project_payload(project),
-    })
+    # Kept for backwards compatibility with older clients, but remote builder
+    # polling is not available in the App Store companion client.
+    return JsonResponse({"ok": False, "error": MOBILE_COMPANION_ERROR}, status=410)
 
 
 @mobile_endpoint("POST", auth=True)
 def publish(request, pk):
-    project = _project_for(request.mobile_user, pk)
-    if not project:
-        return JsonResponse({"ok": False, "error": "project_not_found"}, status=404)
-    if project.status not in {"preview", "live"}:
-        return JsonResponse({"ok": False, "error": "preview_required"}, status=409)
-    publish_project_task.delay(str(project.id))
-    return JsonResponse({"ok": True, "status": "publishing"}, status=202)
+    # Publishing from the mobile client is intentionally disabled.
+    return JsonResponse({"ok": False, "error": MOBILE_COMPANION_ERROR}, status=403)
 
 
 @mobile_endpoint("POST", auth=True)
 def request_store_submission(request, pk):
-    project = _project_for(request.mobile_user, pk)
-    if not project:
-        return JsonResponse({"ok": False, "error": "project_not_found"}, status=404)
-    try:
-        payload = _json_body(request)
-    except ValueError as exc:
-        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
-    platform = str(payload.get("platform") or "both").lower()
-    if platform not in {"android", "ios", "both"}:
-        return JsonResponse({"ok": False, "error": "invalid_platform"}, status=400)
-    submission = StoreSubmission.objects.create(
-        project=project,
-        requested_by=request.mobile_user,
-        platform=platform,
-        notes=str(payload.get("notes") or "")[:4000],
-        eligibility_report={
-            "has_pwa": project.status in {"preview", "live"},
-            "unique_content_review_required": True,
-            "developer_accounts_required": True,
-            "manual_a_plus_review": True,
-        },
-    )
-    return JsonResponse(
-        {
-            "ok": True,
-            "submission": {
-                "id": str(submission.id),
-                "platform": submission.platform,
-                "status": submission.status,
-            },
-        },
-        status=201,
-    )
+    # Store submissions are managed outside the App Store companion client.
+    # Existing submission state remains visible read-only in project_detail.
+    return JsonResponse({"ok": False, "error": MOBILE_COMPANION_ERROR}, status=403)
 
 
 def _delete_user_data(user):
