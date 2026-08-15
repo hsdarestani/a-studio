@@ -27,10 +27,10 @@
     weak_password: "Bitte wählen Sie ein stärkeres Passwort.",
     invalid_project: "Bitte prüfen Sie die Projektdaten.",
     project_not_found: "Das Projekt wurde nicht gefunden.",
-    message_required: "Bitte geben Sie eine Nachricht ein.",
-    message_too_long: "Die Nachricht ist zu lang.",
-    preview_required: "Vor der Veröffentlichung muss ein erfolgreicher Preview-Build vorliegen.",
+    message_required: "Bitte beschreiben Sie Ihre Anfrage.",
+    message_too_long: "Die Anfrage ist zu lang.",
     confirmation_required: "Bitte bestätigen Sie die Kontolöschung.",
+    mobile_companion_only: "Diese Aktion ist in der mobilen Begleit-App nicht verfügbar.",
   }[code] || "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.");
 
   async function api(path, options = {}) {
@@ -59,7 +59,7 @@
   }
 
   function brand() {
-    return `<div class="brand"><div class="brandmark">A+</div><div><b>A+ Studio</b><small>AI Software Factory</small></div></div>`;
+    return `<div class="brand"><div class="brandmark">A+</div><div><b>A+ Studio</b><small>Projektbegleitung</small></div></div>`;
   }
 
   function shell(content, active = state.route) {
@@ -103,9 +103,9 @@
         <section class="auth-card">
           ${brand()}
           <div class="hero-orb"></div>
-          <div class="eyebrow">${signup ? "KONTO ERSTELLEN" : "WILLKOMMEN ZURÜCK"}</div>
-          <h1>${signup ? "Ihre nächste App beginnt hier." : "Bauen. Testen. Veröffentlichen."}</h1>
-          <p class="muted">A+ Studio bringt Idee, AI-Builder, Preview und Veröffentlichung in einen klaren mobilen Workflow.</p>
+          <div class="eyebrow">${signup ? "BEGLEITKONTO ERSTELLEN" : "WILLKOMMEN ZURÜCK"}</div>
+          <h1>${signup ? "Ihr Projekt immer im Blick." : "Status. Abstimmung. Fortschritt."}</h1>
+          <p class="muted">A+ Studio ist die mobile Begleit-App für Softwareprojekte mit A+ Solution. Sie verwalten Projektbriefings, Änderungswünsche und den aktuellen Bearbeitungsstatus.</p>
           ${message ? `<div class="notice error">${escapeHtml(message)}</div>` : ""}
           <form id="auth-form" class="form">
             ${signup ? `
@@ -116,7 +116,7 @@
             <button class="btn primary" type="submit">${signup ? "Konto erstellen" : "Anmelden"}</button>
           </form>
           ${signup ? "" : '<button class="btn secondary full" id="demo-mode">Demo ansehen</button>'}
-          <button class="textbtn" id="auth-switch">${signup ? "Schon registriert? Anmelden" : "Noch kein Konto? Jetzt starten"}</button>
+          <button class="textbtn" id="auth-switch">${signup ? "Schon registriert? Anmelden" : "Noch kein Begleitkonto? Konto erstellen"}</button>
           <div class="legal">
             <a href="${WEB}/privacy/" target="_blank" rel="noopener">Datenschutz</a>
             <a href="${WEB}/terms/" target="_blank" rel="noopener">Bedingungen</a>
@@ -155,29 +155,27 @@
         <section class="auth-card demo-card">
           ${brand()}
           <div class="eyebrow">REVIEW DEMO</div>
-          <h1>So arbeitet A+ Studio.</h1>
-          <p class="muted">Die Demo zeigt den mobilen Workflow ohne Konto. Für einen echten AI-Build kann anschließend kostenlos ein Konto mit Start-Credits erstellt werden.</p>
+          <h1>Mobile Projektbegleitung.</h1>
+          <p class="muted">Diese vollständig lokale Demo zeigt den Funktionsumfang der mobilen App ohne Konto.</p>
           <div class="card">
-            <span class="status preview">Preview bereit</span>
+            <span class="status building">In Umsetzung</span>
             <h3>Luna Booking</h3>
-            <p>Termin-App für einen lokalen Salon · Version 3</p>
+            <p>Softwareprojekt für einen lokalen Salon · zuletzt heute aktualisiert</p>
           </div>
           <div class="card">
-            <h2>AI Builder</h2>
+            <h2>Änderungswünsche</h2>
             <div class="chat">
-              <div class="bubble user"><small>Sie</small><div>Füge eine übersichtliche Wochenansicht für Termine hinzu.</div></div>
-              <div class="bubble assistant"><small>A+ Studio</small><div>Die Wochenansicht ist vorbereitet. Der neue Preview-Build enthält Tagesnavigation, freie Slots und eine kompakte Terminübersicht.</div></div>
+              <div class="bubble user"><small>Kunde</small><div>Bitte die Terminübersicht auf dem Tablet übersichtlicher gestalten.</div></div>
+              <div class="bubble assistant"><small>Projektteam</small><div>Anfrage erfasst · Status: zur Prüfung.</div></div>
             </div>
           </div>
           <div class="card">
-            <h2>Store Publishing</h2>
-            <p>Nach Freigabe prüft A+ Metadaten, Signierung und Store-Compliance für Google Play und den App Store.</p>
+            <h2>Veröffentlichungsstatus</h2>
+            <p>Freigaben und Store-Status können eingesehen werden. Die mobile App erstellt, lädt oder führt keinen Programmcode aus.</p>
           </div>
-          <button class="btn primary full" id="demo-signup">Kostenlos ausprobieren</button>
-          <button class="textbtn" id="demo-back">Zur Anmeldung</button>
+          <button class="btn primary full" id="demo-back">Zur Anmeldung</button>
         </section>
       </main>`;
-    document.getElementById("demo-signup").addEventListener("click", () => showAuth("signup"));
     document.getElementById("demo-back").addEventListener("click", () => showAuth("login"));
   }
 
@@ -197,20 +195,23 @@
 
   function statusLabel(status) {
     return ({
-      draft: "Entwurf",
-      building: "Build läuft",
-      preview: "Preview bereit",
-      live: "Live",
+      draft: "Briefing",
+      building: "In Umsetzung",
+      preview: "Interne Abnahme",
+      live: "Veröffentlicht",
       paused: "Pausiert",
-      error: "Fehler",
+      error: "Klärung erforderlich",
+      proposed: "Zur Prüfung",
+      approved: "Freigegeben",
+      done: "Erledigt",
+      rejected: "Abgelehnt",
+      failed: "Klärung erforderlich",
       requested: "Angefragt",
       eligibility: "Prüfung",
-      accounts: "Developer-Konten",
+      accounts: "Kontenprüfung",
       preparing: "Vorbereitung",
       submitted: "Eingereicht",
       review: "In Prüfung",
-      approved: "Freigegeben",
-      rejected: "Abgelehnt",
     }[status] || status || "–");
   }
 
@@ -221,10 +222,10 @@
       <section class="hero">
         <div class="eyebrow">WORKSPACE</div>
         <h1>${escapeHtml(data.organization.name)}</h1>
-        <p>Von der Idee zum installierbaren Produkt – mit Preview, Versionierung und A+ Publishing.</p>
+        <p>Projektstatus, Briefings und Änderungswünsche – kompakt in einer mobilen Begleit-App.</p>
         <div class="metrics">
           <div><b>${data.projects.length}</b><span>Projekte</span></div>
-          <div><b>${Number(data.organization.credits) || 0}</b><span>Credits</span></div>
+          <div><b>${data.projects.filter((project) => project.status !== "live").length}</b><span>Aktiv</span></div>
         </div>
       </section>
       <div class="section-head"><h2>Projekte</h2><button class="smallbtn" data-route="new">+ Neu</button></div>
@@ -240,9 +241,9 @@
           </button>`).join("") : `
           <div class="empty">
             <div class="empty-icon">✦</div>
-            <h3>Noch kein Projekt</h3>
-            <p>Beschreiben Sie Ihre Idee. A+ Studio erstellt daraus den ersten Preview-Build.</p>
-            <button class="btn primary" data-route="new">Erstes Projekt erstellen</button>
+            <h3>Noch kein Projektraum</h3>
+            <p>Legen Sie ein Briefing an, um Anforderungen und Abstimmung mit dem A+ Projektteam zu organisieren.</p>
+            <button class="btn primary" data-route="new">Projekt anlegen</button>
           </div>`}
       </section>
     `, "projects");
@@ -256,16 +257,16 @@
   async function renderNewProject() {
     await loadMe();
     shell(`
-      <div class="eyebrow">NEUES PRODUKT</div>
-      <h1>Was sollen wir bauen?</h1>
-      <p class="lead">Geben Sie Kontext statt Technik vor. Der Builder erzeugt daraus die erste sichere App-Spezifikation und Preview.</p>
+      <div class="eyebrow">PROJEKTBRIEFING</div>
+      <h1>Neuen Projektraum anlegen</h1>
+      <p class="lead">Erfassen Sie Ziel, Branche und Anforderungen für die Zusammenarbeit mit dem A+ Projektteam.</p>
       <form id="project-form" class="form card">
-        <label>App-Name<input name="name" required maxlength="160" placeholder="z. B. Luna Booking"></label>
+        <label>Projektname<input name="name" required maxlength="160" placeholder="z. B. Luna Booking"></label>
         <label>Branche / Geschäftstyp<input name="business_type" required maxlength="120" placeholder="z. B. Friseursalon"></label>
-        <label>Ziel & Funktionen<textarea name="description" rows="7" required placeholder="Wer nutzt die App? Was soll sie im Alltag lösen? Welche Kernfunktionen brauchen Sie?"></textarea></label>
-        <label>Sprache<select name="language"><option value="de">Deutsch</option><option value="en">English</option></select></label>
-        <div class="notice">Die Erstellung nutzt Ihre Studio-Credits. Käufe und Abos werden in dieser mobilen Version bewusst nicht angeboten.</div>
-        <button class="btn primary" type="submit">Preview erstellen</button>
+        <label>Ziel & Anforderungen<textarea name="description" rows="7" required placeholder="Wer nutzt das Produkt? Welches Problem soll gelöst werden? Welche Anforderungen sind wichtig?"></textarea></label>
+        <label>Projektsprache<select name="language"><option value="de">Deutsch</option><option value="en">English</option></select></label>
+        <div class="notice">Die mobile App dient ausschließlich der Projektkoordination. Sie erstellt, lädt, installiert oder führt keinen Programmcode und keine anderen Apps aus.</div>
+        <button class="btn primary" type="submit">Projekt anlegen</button>
       </form>
     `, "new");
     document.getElementById("project-form").addEventListener("submit", async (event) => {
@@ -281,10 +282,34 @@
         await render();
       } catch (error) {
         button.disabled = false;
-        button.textContent = "Preview erstellen";
+        button.textContent = "Projekt anlegen";
         alert(error.message);
       }
     });
+  }
+
+  function renderChangeRequests(items) {
+    if (!items?.length) {
+      return '<p class="muted">Noch keine Änderungswünsche erfasst.</p>';
+    }
+    return `<div class="submission-list">${items.map((item) => `
+      <div>
+        <b>${escapeHtml(item.title)}</b>
+        <span>${escapeHtml(statusLabel(item.status))}</span>
+      </div>
+    `).join("")}</div>`;
+  }
+
+  function renderStoreStatus(items) {
+    if (!items?.length) {
+      return '<p class="muted">Noch kein Veröffentlichungsstatus vorhanden.</p>';
+    }
+    return `<div class="submission-list">${items.map((item) => `
+      <div>
+        <b>${item.platform === "both" ? "Apple + Google" : item.platform === "ios" ? "Apple App Store" : "Google Play"}</b>
+        <span>${escapeHtml(statusLabel(item.status))}</span>
+      </div>
+    `).join("")}</div>`;
   }
 
   async function renderProject() {
@@ -292,115 +317,55 @@
     loading("Projekt");
     const data = await api(`/projects/${state.selectedProject}/`);
     const project = data.project;
-    const hasPreview = ["preview", "live"].includes(project.status);
     shell(`
       <div class="project-title">
         <div>
           <span class="status ${project.status}">${escapeHtml(statusLabel(project.status))}</span>
           <h1>${escapeHtml(project.name)}</h1>
-          <p>${escapeHtml(project.business_type)} · Version ${project.version}</p>
+          <p>${escapeHtml(project.business_type)}</p>
         </div>
       </div>
-      ${project.last_build_error ? `<div class="notice error">${escapeHtml(project.last_build_error)}</div>` : ""}
+
       <section class="card">
-        <div class="section-head"><h2>Build</h2><span class="pill">${escapeHtml(statusLabel(project.status))}</span></div>
+        <div class="section-head"><h2>Projektstatus</h2><span class="pill">${escapeHtml(statusLabel(project.status))}</span></div>
         <p>${escapeHtml(project.description)}</p>
-        <div class="actions">
-          ${project.preview_url ? `<a class="btn secondary" href="${escapeHtml(project.preview_url)}" target="_blank" rel="noopener">Preview öffnen</a>` : ""}
-          ${project.live_url && project.status === "live" ? `<a class="btn secondary" href="${escapeHtml(project.live_url)}" target="_blank" rel="noopener">Live öffnen</a>` : ""}
-          ${hasPreview ? '<button class="btn primary" data-publish>Live veröffentlichen</button>' : ""}
-        </div>
+        <div class="notice">Technische Builds, ausführbarer Code und App-Previews sind kein Bestandteil dieser mobilen App.</div>
       </section>
 
       <section class="card">
-        <div class="section-head"><h2>AI Builder</h2><span class="pill">Chat</span></div>
-        <div class="chat" id="chat-list">
-          ${project.messages.length ? project.messages.map((message) => `
-            <div class="bubble ${message.role === "user" ? "user" : "assistant"}">
-              <small>${message.role === "user" ? "Sie" : "A+ Studio"}</small>
-              <div>${escapeHtml(message.content)}</div>
-              ${message.status === "working" || message.status === "queued" ? '<span class="working">In Arbeit…</span>' : ""}
-            </div>`).join("") : '<p class="muted">Beschreiben Sie die nächste Änderung am Produkt.</p>'}
-        </div>
-        <form id="chat-form" class="chat-form">
-          <textarea name="message" rows="3" maxlength="12000" required placeholder="z. B. Füge eine Terminübersicht mit Wochenansicht hinzu."></textarea>
-          <button class="btn primary" type="submit">Änderung senden</button>
+        <div class="section-head"><h2>Änderungswünsche</h2><span class="pill">Projektteam</span></div>
+        ${renderChangeRequests(project.change_requests)}
+        <form id="request-form" class="chat-form">
+          <textarea name="message" rows="4" maxlength="12000" required placeholder="Beschreiben Sie Ihre Änderung, Frage oder Priorität für das Projektteam."></textarea>
+          <button class="btn primary" type="submit">Anfrage senden</button>
         </form>
       </section>
 
       <section class="card">
-        <div class="section-head"><h2>Store Publishing</h2><span class="pill">Managed</span></div>
-        <p>A+ prüft App-Qualität, Developer-Konten, Metadaten und Store-Compliance vor der Einreichung.</p>
-        ${project.store_submissions.length ? `
-          <div class="submission-list">${project.store_submissions.map((item) => `
-            <div><b>${item.platform === "both" ? "Apple + Google" : item.platform === "ios" ? "Apple App Store" : "Google Play"}</b><span>${escapeHtml(statusLabel(item.status))}</span></div>
-          `).join("")}</div>` : ""}
-        <div class="actions">
-          <button class="btn secondary" data-store="android">Google Play anfragen</button>
-          <button class="btn secondary" data-store="ios">App Store anfragen</button>
-          <button class="btn primary" data-store="both">Beide Stores</button>
-        </div>
+        <div class="section-head"><h2>Veröffentlichungsstatus</h2><span class="pill">Nur Status</span></div>
+        ${renderStoreStatus(project.store_submissions)}
+        <p class="muted">Store-Einreichungen werden außerhalb dieser mobilen App vom Projektteam verwaltet.</p>
       </section>
     `, "projects");
 
-    root.querySelector("[data-publish]")?.addEventListener("click", async (event) => {
-      event.currentTarget.disabled = true;
-      try {
-        await api(`/projects/${project.id}/publish/`, { method: "POST", body: "{}" });
-        alert("Publishing wurde gestartet.");
-        await renderProject();
-      } catch (error) {
-        alert(error.message);
-        event.currentTarget.disabled = false;
-      }
-    });
-
-    root.querySelectorAll("[data-store]").forEach((button) => button.addEventListener("click", async () => {
-      button.disabled = true;
-      try {
-        await api(`/projects/${project.id}/store-submission/`, {
-          method: "POST",
-          body: JSON.stringify({ platform: button.dataset.store }),
-        });
-        await renderProject();
-      } catch (error) {
-        alert(error.message);
-        button.disabled = false;
-      }
-    }));
-
-    document.getElementById("chat-form").addEventListener("submit", async (event) => {
+    document.getElementById("request-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const button = event.currentTarget.querySelector("button");
       const message = new FormData(event.currentTarget).get("message");
       button.disabled = true;
+      button.textContent = "Wird gesendet…";
       try {
-        const queued = await api(`/projects/${project.id}/chat/`, {
+        await api(`/projects/${project.id}/chat/`, {
           method: "POST",
           body: JSON.stringify({ message }),
         });
-        await pollMessage(project.id, queued.assistant_message_id);
+        await renderProject();
       } catch (error) {
         alert(error.message);
         button.disabled = false;
+        button.textContent = "Anfrage senden";
       }
     });
-  }
-
-  async function pollMessage(projectId, messageId) {
-    for (let attempt = 0; attempt < 72; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2500));
-      try {
-        const data = await api(`/projects/${projectId}/messages/${messageId}/`);
-        if (["done", "failed"].includes(data.message.status)) {
-          await renderProject();
-          return;
-        }
-      } catch (_) {
-        break;
-      }
-    }
-    await renderProject();
   }
 
   async function renderAccount() {
@@ -411,8 +376,10 @@
       <section class="card profile">
         <div><small>E-Mail</small><b>${escapeHtml(me.email)}</b></div>
         <div><small>Workspace</small><b>${escapeHtml(me.organization.name)}</b></div>
-        <div><small>Plan</small><b>${escapeHtml(me.organization.plan)}</b></div>
-        <div><small>Credits</small><b>${Number(me.organization.credits) || 0}</b></div>
+      </section>
+      <section class="card">
+        <h2>Über diese App</h2>
+        <p class="muted">A+ Studio für iOS ist eine kostenlose Begleit-App zur Projektkoordination. In der App gibt es keine Käufe, Abonnements, Credits oder Freischaltungen.</p>
       </section>
       <section class="card">
         <h2>Hilfe & Rechtliches</h2>
