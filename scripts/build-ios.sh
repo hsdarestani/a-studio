@@ -28,7 +28,9 @@ fi
 
 # The shared local UI also powers the Android companion. Prepare an iOS-only
 # copy before `cap sync` so the App Store bundle does not mention competing
-# distribution platforms, then restore the shared source immediately.
+# distribution platforms and cannot create business/organization accounts.
+# Existing A+ Studio customers can sign in with credentials provisioned outside
+# the iOS app; web and Android registration remain unchanged.
 IOS_APP_JS="$ROOT/www/app.js"
 IOS_APP_JS_BACKUP="$ROOT/www/.app.js.publisher-ios-backup"
 restore_ios_web() {
@@ -52,6 +54,58 @@ text = text.replace(
     'item.platform === "both" ? "Apple + Google" : item.platform === "ios" ? "Apple App Store" : "Google Play"',
     '"Apple App Store"',
 )
+
+# App Review Guideline 3.1.1: the iOS companion is existing-account login only.
+# Remove every reachable account-creation affordance from the native bundle
+# while leaving the shared Android/web source intact after cap sync.
+text = text.replace(
+    'function showAuth(mode = "login", message = "") {\n    const signup = mode === "signup";',
+    'function showAuth(mode = "login", message = "") {\n    const signup = false;',
+)
+text = text.replace(
+    '${signup ? "BEGLEITKONTO ERSTELLEN" : "WILLKOMMEN ZURÜCK"}',
+    'WILLKOMMEN ZURÜCK',
+)
+text = text.replace(
+    '${signup ? "Ihr Projekt immer im Blick." : "Status. Abstimmung. Fortschritt."}',
+    'Status. Abstimmung. Fortschritt.',
+)
+text = text.replace(
+    '''            ${signup ? `
+              <label>Vollständiger Name<input name="full_name" autocomplete="name" required></label>
+              <label>Unternehmen<input name="company_name" autocomplete="organization" required></label>` : ""}
+''',
+    '',
+)
+text = text.replace(
+    'autocomplete="${signup ? "new-password" : "current-password"}"',
+    'autocomplete="current-password"',
+)
+text = text.replace(
+    '${signup ? "Konto erstellen" : "Anmelden"}',
+    'Anmelden',
+)
+text = text.replace(
+    '${signup ? "" : \'<button class="btn secondary full" id="demo-mode">Demo ansehen</button>\'}',
+    '<button class="btn secondary full" id="demo-mode">Demo ansehen</button>',
+)
+text = text.replace(
+    '          <button class="textbtn" id="auth-switch">${signup ? "Schon registriert? Anmelden" : "Noch kein Begleitkonto? Konto erstellen"}</button>\n',
+    '',
+)
+text = text.replace(
+    '    document.getElementById("auth-switch").addEventListener("click", () => showAuth(signup ? "login" : "signup"));\n',
+    '',
+)
+text = text.replace(
+    '        const data = await api(signup ? "/signup/" : "/login/", {',
+    '        const data = await api("/login/", {',
+)
+text = text.replace(
+    'Sie können die App jetzt schließen oder ein neues Konto erstellen.',
+    'Sie können die App jetzt schließen oder sich erneut anmelden.',
+)
+
 path.write_text(text, encoding="utf-8")
 
 for candidate in (Path("www/index.html"), Path("www/app.js"), Path("www/app.css")):
@@ -62,10 +116,47 @@ for candidate in (Path("www/index.html"), Path("www/app.js"), Path("www/app.css"
                 f"iOS native web bundle still contains forbidden third-party platform reference {forbidden!r} in {candidate}"
             )
 
-print("iOS native web bundle sanitized for App Store review.")
+# Fail the build if a future UI change accidentally restores business account
+# registration to the iOS native bundle.
+ios_js = Path("www/app.js").read_text(encoding="utf-8")
+for forbidden in (
+    'name="company_name"',
+    '/signup/',
+    'Konto erstellen',
+    'BEGLEITKONTO ERSTELLEN',
+    'id="auth-switch"',
+):
+    if forbidden in ios_js:
+        raise SystemExit(f"iOS native bundle still exposes account registration marker: {forbidden!r}")
+
+print("iOS native web bundle sanitized for App Store review (login-only, no account registration).")
 PY
 
 npx cap sync ios
+
+# Verify the generated Capacitor payload, not only the temporary source copy.
+GENERATED_IOS_JS="$ROOT/ios/App/App/public/app.js"
+if [ ! -f "$GENERATED_IOS_JS" ]; then
+  echo "Generated iOS app.js is missing after cap sync." >&2
+  exit 4
+fi
+python3 - "$GENERATED_IOS_JS" <<'PY'
+from pathlib import Path
+import sys
+
+payload = Path(sys.argv[1]).read_text(encoding="utf-8")
+for forbidden in (
+    'name="company_name"',
+    '/signup/',
+    'Konto erstellen',
+    'BEGLEITKONTO ERSTELLEN',
+    'id="auth-switch"',
+):
+    if forbidden in payload:
+        raise SystemExit(f"Generated iOS bundle contains account registration marker: {forbidden!r}")
+print("Generated iOS Capacitor bundle verified: existing-account login only.")
+PY
+
 restore_ios_web
 trap - EXIT
 
@@ -85,7 +176,7 @@ restore_icon_sources() {
 trap restore_icon_sources EXIT
 if [ ! -f "$APPICON_SOURCE" ]; then
   echo "Canonical iOS icon is missing: $APPICON_SOURCE" >&2
-  exit 4
+  exit 5
 fi
 if [ -f "$ICON_SVG" ]; then
   mv "$ICON_SVG" "$ICON_SVG_BACKUP"
@@ -105,7 +196,7 @@ trap - EXIT
 APPICON_SET="$ROOT/ios/App/App/Assets.xcassets/AppIcon.appiconset"
 if [ ! -d "$APPICON_SET" ] || [ ! -f "$APPICON_SET/Contents.json" ]; then
   echo "iOS AppIcon asset catalog was not generated." >&2
-  exit 5
+  exit 6
 fi
 
 PRIVACY_MANIFEST="$ROOT/ios/App/App/PrivacyInfo.xcprivacy"
@@ -124,9 +215,9 @@ mkdir -p artifacts build/ios
 ARCHIVE="$ROOT/build/ios/AStudio.xcarchive"
 EXPORT_DIR="$ROOT/build/ios/export"
 VERSION="${APP_VERSION_NAME:-${APP_VERSION:-1.0.0}}"
-# Build 3 was rejected on 2026-08-15. Default the next publisher build to 4;
-# CI/release automation can always override with APP_BUILD_NUMBER/BUILD_NUMBER.
-BUILD="${APP_BUILD_NUMBER:-${BUILD_NUMBER:-4}}"
+# Build 4 was rejected on 2026-08-16 for business account registration.
+# Default the next Publisher build to 5; automation may override explicitly.
+BUILD="${APP_BUILD_NUMBER:-${BUILD_NUMBER:-5}}"
 TEAM_ID="${APPLE_TEAM_ID:-${IOS_TEAM_ID:-}}"
 AUTH_KEY_PATH="${APPLE_AUTH_KEY_PATH:-${APPLE_API_KEY_PATH:-}}"
 SIGNING_STYLE="${IOS_SIGNING_STYLE:-Automatic}"
@@ -141,7 +232,7 @@ elif [ -d ios/App/App.xcodeproj ]; then
   XCODE_CONTAINER=(-project ios/App/App.xcodeproj)
 else
   echo "No generated iOS Xcode project exists after cap sync." >&2
-  exit 6
+  exit 7
 fi
 
 XCODE_ARGS=(
@@ -165,7 +256,7 @@ fi
 if [ "$SIGNING_STYLE" = "Manual" ]; then
   if [ -z "$PROFILE_SPECIFIER" ] || [ -z "$SIGNING_KEYCHAIN" ]; then
     echo "Manual iOS signing requires Publisher provisioning profile and keychain." >&2
-    exit 7
+    exit 8
   fi
   XCODE_ARGS+=(
     CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY"
@@ -208,7 +299,7 @@ PLIST
 else
   cat > "$EXPORT_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//W3C//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>method</key><string>app-store-connect</string>
 <key>signingStyle</key><string>automatic</string>
@@ -239,7 +330,7 @@ xcodebuild "${EXPORT_ARGS[@]}"
 IPA="$(find "$EXPORT_DIR" -name '*.ipa' -type f | head -n 1)"
 if [ -z "$IPA" ]; then
   echo "No IPA was produced." >&2
-  exit 8
+  exit 9
 fi
 cp "$IPA" artifacts/a-studio.ipa
 
