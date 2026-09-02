@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AppRecord, AppUser
+from .models import AppFile, AppRecord, AppUser
 
 
 @admin.register(AppUser)
@@ -18,4 +18,13 @@ class AppRecordAdmin(admin.ModelAdmin):
     list_filter = ("collection", "project")
     search_fields = ("project__name", "owner__email", "collection")
     readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
+
+
+@admin.register(AppFile)
+class AppFileAdmin(admin.ModelAdmin):
+    list_display = ("original_name", "project", "owner", "content_type", "size", "created_at")
+    list_filter = ("content_type", "project")
+    search_fields = ("original_name", "project__name", "owner__email", "sha256")
+    readonly_fields = ("storage_key", "sha256", "size", "created_at")
     ordering = ("-created_at",)
