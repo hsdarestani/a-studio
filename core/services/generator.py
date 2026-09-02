@@ -4,6 +4,7 @@ import json
 import shutil
 from pathlib import Path
 from django.conf import settings
+from managed_backend.security import active_features
 from .ai import sanitize_spec
 
 
@@ -117,8 +118,20 @@ def _service_worker(project):
     )
 
 
-def generate_preview(project):
+def _runtime_spec(project):
     spec = sanitize_spec(project.app_spec)
+    requested = [str(item) for item in (project.backend_features or [])]
+    spec["backend"] = {
+        "api_version": 1,
+        "api_base": f"{settings.APP_PUBLIC_URL}/api/apps/{project.slug}",
+        "features": active_features(project),
+        "requested_features": requested,
+    }
+    return spec
+
+
+def generate_preview(project):
+    spec = _runtime_spec(project)
     root = Path(settings.APP_DATA_ROOT) / "preview" / project.slug
     if root.exists():
         shutil.rmtree(root)
