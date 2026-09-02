@@ -7,14 +7,14 @@
 
   <section class="v2-create-hero">
     <div>
-      <div class="eyebrow dark">A+ STUDIO V2</div>
+      <div class="eyebrow dark">A+ STUDIO V3</div>
       <h1>{% trans "Start with an idea, a repo or a website." %}</h1>
-      <p>{% trans "Studio imports useful context, builds in isolation and keeps production untouched until you approve the preview." %}</p>
+      <p>{% trans "Choose the safe PWA builder or a real code workspace. Studio imports context, builds in preview and keeps production untouched until approval." %}</p>
     </div>
     <div class="v2-badge-row">
       <span class="v2-badge">Prompt → App</span>
       <span class="v2-badge">GitHub Import</span>
-      <span class="v2-badge">URL Import</span>
+      <span class="v2-badge">Code Agent</span>
       <span class="v2-badge">Backend Kit</span>
     </div>
   </section>
@@ -85,7 +85,7 @@
 
       <section class="v2-panel v2-check-grid">
         <h2>{% trans "3. Backend kit" %}</h2>
-        <p>{% trans "Select capabilities the product architecture should be ready for. These requirements are included in the builder context from the first build." %}</p>
+        <p>{% trans "Select capabilities the product architecture should be ready for. Authentication, database and storage can be used by generated apps immediately." %}</p>
         {{ form.backend_features }}
         {% if form.backend_features.errors %}<span class="v2-error">{{ form.backend_features.errors|striptags }}</span>{% endif %}
       </section>
@@ -97,12 +97,12 @@
         <h3>{% trans "What happens after Create" %}</h3>
         <div class="v2-flow">
           <div class="v2-flow-step"><i>1</i><div><b>{% trans "Source intake" %}</b><span>{% trans "Prompt, GitHub context or safe website extraction." %}</span></div></div>
-          <div class="v2-flow-step"><i>2</i><div><b>{% trans "AI architecture" %}</b><span>{% trans "Business brief and backend requirements become one build context." %}</span></div></div>
-          <div class="v2-flow-step"><i>3</i><div><b>{% trans "Isolated preview" %}</b><span>{% trans "The generated version is separated from production." %}</span></div></div>
+          <div class="v2-flow-step"><i>2</i><div><b>{% trans "AI architecture" %}</b><span>{% trans "Safe PWA spec or real source files, depending on the selected engine." %}</span></div></div>
+          <div class="v2-flow-step"><i>3</i><div><b>{% trans "Revision + preview" %}</b><span>{% trans "Code changes are validated and previewed before production." %}</span></div></div>
           <div class="v2-flow-step"><i>4</i><div><b>{% trans "Approval gate" %}</b><span>{% trans "Nothing goes live until you explicitly publish it." %}</span></div></div>
         </div>
         <button class="button full" type="submit">{% trans "Create project" %} →</button>
-        <div class="v2-security-note">{% trans "Website imports block local/private network targets. Code Agent is exposed only when an isolated sandbox worker is configured." %}</div>
+        <div class="v2-security-note">{% trans "Code Agent V3 can edit static web source safely without executing it on the Studio host. Framework builds use the separately isolated executable sandbox when configured." %}</div>
       </div>
     </aside>
   </form>
