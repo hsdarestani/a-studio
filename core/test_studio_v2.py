@@ -3,9 +3,10 @@ import hmac
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from .forms import ProjectCreateForm
-from .models import Organization, Project, SandboxRun
+from .models import Membership, Organization, Project, SandboxRun
 from .services.sandbox import sandbox_ready, verify_signature
 from .services.source_import import SourceImportError, normalize_source_url
 
@@ -86,6 +87,36 @@ class StudioV2ModelTests(TestCase):
         self.assertEqual(run.network_policy, "restricted")
         self.assertEqual(run.memory_limit_mb, 768)
         self.assertEqual(run.timeout_seconds, 300)
+
+
+class PhonePreviewQRTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(username="qr@example.com", email="qr@example.com", password="test-pass-123")
+        self.other = user_model.objects.create_user(username="other@example.com", email="other@example.com", password="test-pass-123")
+        self.organization = Organization.objects.create(name="QR GmbH", owner=self.user)
+        Membership.objects.create(organization=self.organization, user=self.user, role="owner")
+        self.project = Project.objects.create(
+            organization=self.organization,
+            created_by=self.user,
+            name="Phone Demo",
+            business_type="Retail",
+            description="Preview on phone",
+        )
+        self.url = reverse("preview_qr", kwargs={"pk": self.project.pk})
+
+    def test_member_can_render_private_qr_svg(self):
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/svg+xml")
+        self.assertIn(b"<svg", response.content)
+        self.assertIn("private", response["Cache-Control"])
+
+    def test_non_member_cannot_render_project_qr(self):
+        self.client.force_login(self.other)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 404)
 
 
 @override_settings(
