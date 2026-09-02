@@ -64,3 +64,25 @@ class AppRecord(models.Model):
 
     def __str__(self):
         return f"{self.project}:{self.collection}:{self.id}"
+
+
+class AppFile(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey("core.Project", on_delete=models.CASCADE, related_name="managed_files")
+    owner = models.ForeignKey(AppUser, on_delete=models.CASCADE, related_name="files")
+    storage_key = models.CharField(max_length=500, unique=True)
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=160)
+    size = models.PositiveBigIntegerField()
+    sha256 = models.CharField(max_length=64)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["project", "owner", "-created_at"], name="mb_file_owner_created_idx"),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.original_name} · {self.owner.email}"
