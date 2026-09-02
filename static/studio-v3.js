@@ -34,6 +34,15 @@
     editorStatus.dataset.type = type;
   }
 
+  function showText(container, text) {
+    if (!container) return;
+    container.replaceChildren();
+    const node = document.createElement('div');
+    node.className = 'v3-ide-empty';
+    node.textContent = String(text || '');
+    container.appendChild(node);
+  }
+
   function switchPanel(name) {
     tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.v3Tab === name));
     panels.forEach(panel => { panel.hidden = panel.dataset.v3Panel !== name; });
@@ -52,7 +61,7 @@
 
   function renderFileList(files) {
     if (!fileList) return;
-    fileList.innerHTML = '';
+    fileList.replaceChildren();
     (files || []).forEach(item => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -74,7 +83,7 @@
       renderFileList(payload.files || []);
       if (!selectedPath && payload.entry) await loadFile(payload.entry);
     } catch (error) {
-      fileList.innerHTML = `<div class="v3-ide-empty">${error.message}</div>`;
+      showText(fileList, error.message);
     }
   }
 
@@ -128,7 +137,7 @@
       originalContent = editor.value;
       currentVersion = Number(payload.version || currentVersion + 1);
       workspace.dataset.projectVersion = String(currentVersion);
-      setStatus(`Saved · v${currentVersion}`, 'success');
+      setStatus(payload.repo_sync_error ? `Saved · v${currentVersion} · repository sync pending` : `Saved · v${currentVersion}`, payload.repo_sync_error ? 'warning' : 'success');
       if (versionNode) versionNode.textContent = `Version ${currentVersion}`;
       if (preview) {
         const url = new URL(payload.preview_url || preview.src, window.location.origin);
@@ -145,15 +154,15 @@
 
   async function loadChanges() {
     if (!urls.changes || !changesList) return;
-    changesList.innerHTML = '<div class="v3-ide-empty">Loading revisions…</div>';
+    showText(changesList, 'Loading revisions…');
     try {
       const payload = await jsonFetch(urls.changes);
       const changes = payload.changes || [];
       if (!changes.length) {
-        changesList.innerHTML = '<div class="v3-ide-empty">No code revisions yet.</div>';
+        showText(changesList, 'No code revisions yet.');
         return;
       }
-      changesList.innerHTML = '';
+      changesList.replaceChildren();
       changes.forEach(item => {
         const card = document.createElement('article');
         card.className = 'v3-change-card';
@@ -164,12 +173,18 @@
         card.querySelector('p').textContent = item.description || '';
         const fileWrap = card.querySelector('.v3-change-files');
         files.forEach(path => {
-          const span = document.createElement('span'); span.textContent = path; fileWrap.appendChild(span);
+          const span = document.createElement('span');
+          span.textContent = path;
+          fileWrap.appendChild(span);
         });
         const diffButton = card.querySelector('.v3-diff-button');
         const diffView = card.querySelector('.v3-diff-view');
         diffButton.addEventListener('click', async () => {
-          if (!diffView.hidden) { diffView.hidden = true; diffButton.textContent = 'View diff'; return; }
+          if (!diffView.hidden) {
+            diffView.hidden = true;
+            diffButton.textContent = 'View diff';
+            return;
+          }
           diffButton.disabled = true;
           try {
             const url = `${urls.diffBase}${item.id}/`;
@@ -180,12 +195,14 @@
           } catch (error) {
             diffView.textContent = error.message;
             diffView.hidden = false;
-          } finally { diffButton.disabled = false; }
+          } finally {
+            diffButton.disabled = false;
+          }
         });
         changesList.appendChild(card);
       });
     } catch (error) {
-      changesList.innerHTML = `<div class="v3-ide-empty">${error.message}</div>`;
+      showText(changesList, error.message);
     }
   }
 
