@@ -14,7 +14,8 @@ from django.views.decorators.http import require_GET, require_POST
 from .forms import ProjectCreateForm, SignUpForm
 from .models import Conversation, CreditTransaction, Membership, Message, Organization, Project, StoreSubmission
 from .services.pricing import PLANS
-from .tasks import process_chat_message, provision_initial_project, publish_project_task
+from .tasks import process_chat_message, publish_project_task
+from .v2_tasks import import_and_provision_initial_project
 
 
 def _organization_for(user):
@@ -38,6 +39,7 @@ def _project_state_payload(project):
     project.refresh_from_db()
     project.organization.refresh_from_db()
     latest = project.deployments.order_by("-created_at").first()
+    sandbox = project.sandbox_runs.order_by("-created_at").first()
     return {
         "id": str(project.id),
         "status": project.status,
@@ -47,12 +49,22 @@ def _project_state_payload(project):
         "live_url": project.live_url,
         "repo_url": project.repo_url,
         "repo_name": project.repo_name,
+        "builder_mode": project.builder_mode,
+        "source_type": project.source_type,
+        "source_url": project.source_url,
+        "source_imported": bool(project.source_imported_at),
+        "backend_features": project.backend_features,
         "last_build_error": project.last_build_error,
         "deployment": {
             "status": latest.status,
             "environment": latest.environment,
             "version": latest.version,
         } if latest else None,
+        "sandbox": {
+            "status": sandbox.status,
+            "kind": sandbox.kind,
+            "runtime": sandbox.runtime,
+        } if sandbox else None,
     }
 
 
@@ -105,8 +117,11 @@ def project_create(request):
         project.created_by = request.user
         project.save()
         Conversation.objects.create(project=project)
-        provision_initial_project.delay(str(project.id))
-        messages.success(request, _("Your project is being prepared. The first preview will appear in the conversation."))
+        import_and_provision_initial_project.delay(str(project.id))
+        if project.source_type == "prompt":
+            messages.success(request, _("Your project is being prepared. The first preview will appear in the conversation."))
+        else:
+            messages.success(request, _("Studio is importing the source and preparing the first isolated preview."))
         return redirect("project_detail", pk=project.id)
     return render(request, "project_create.html", {"form": form, "organization": organization})
 
@@ -122,6 +137,7 @@ def project_detail(request, pk):
         "chat_messages": chat_messages,
         "organization": project.organization,
         "deployments": project.deployments.order_by("-created_at")[:8],
+        "sandbox_runs": project.sandbox_runs.order_by("-created_at")[:5],
     })
 
 
