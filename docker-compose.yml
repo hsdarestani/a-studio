@@ -30,6 +30,10 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      RUN_MIGRATIONS: "1"
+      RUN_COLLECTSTATIC: "1"
+      RUN_BOOTSTRAP_ADMIN: "1"
     command: gunicorn studio.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 180
     depends_on:
       db:
@@ -49,9 +53,13 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+      RUN_BOOTSTRAP_ADMIN: "0"
     command: celery -A studio worker -l INFO --concurrency=2
     depends_on:
-      db:
+      web:
         condition: service_healthy
       redis:
         condition: service_healthy
