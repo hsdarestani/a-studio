@@ -16,6 +16,11 @@ _BLOCKED_TYPES = {
     "application/x-msdownload",
     "application/x-executable",
 }
+_BLOCKED_SUFFIXES = {
+    ".html", ".htm", ".xhtml", ".svg", ".js", ".mjs", ".cjs",
+    ".exe", ".dll", ".com", ".scr", ".msi", ".bat", ".cmd",
+    ".sh", ".bash", ".zsh", ".ps1", ".php", ".phar",
+}
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._ -]+")
 
 
@@ -38,10 +43,11 @@ def validate_upload(upload):
         raise ValueError("empty_file")
     if size > max_bytes:
         raise ValueError("file_too_large")
+    original_name = clean_original_name(getattr(upload, "name", "file"))
     content_type = str(getattr(upload, "content_type", "") or "application/octet-stream").lower().split(";", 1)[0].strip()
-    if content_type in _BLOCKED_TYPES:
+    if content_type in _BLOCKED_TYPES or Path(original_name).suffix.lower() in _BLOCKED_SUFFIXES:
         raise ValueError("file_type_blocked")
-    return clean_original_name(getattr(upload, "name", "file")), content_type, size
+    return original_name, content_type, size
 
 
 def save_upload(project, user, upload):
