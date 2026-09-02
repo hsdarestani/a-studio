@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import legal_views, mobile_api, preview_views, sandbox_views, views, workflow_views
+from . import code_views, legal_views, mobile_api, preview_views, sandbox_views, views, workflow_views
 
 urlpatterns = [
     path("", views.landing, name="landing"),
@@ -53,6 +53,11 @@ urlpatterns = [
         workflow_views.message_status,
         name="message_status",
     ),
+    path("projects/<uuid:pk>/code/", code_views.code_manifest, name="code_manifest"),
+    path("projects/<uuid:pk>/code/file/", code_views.code_file, name="code_file"),
+    path("projects/<uuid:pk>/code/save/", code_views.code_file_save, name="code_file_save"),
+    path("projects/<uuid:pk>/code/changes/", code_views.code_changes, name="code_changes"),
+    path("projects/<uuid:pk>/code/diff/<uuid:feature_id>/", code_views.code_diff, name="code_diff"),
     path("projects/<uuid:pk>/publish/", views.publish_project, name="publish_project"),
     path("projects/<uuid:pk>/spec/", views.export_spec, name="export_spec"),
     path("projects/<uuid:pk>/download/", views.download_build, name="download_build"),
