@@ -1,8 +1,8 @@
 import hashlib
-import json
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -17,6 +17,12 @@ _BLOCKED_NAMES = {".env", ".git", ".gitignore", "package-lock.json", "yarn.lock"
 _SAFE_PART = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 _MAX_FILE_BYTES = 512 * 1024
 _MAX_FILES = 80
+_BLOCKED_CODE_PATTERNS = (
+    re.compile(r"\beval\s*\(", re.I),
+    re.compile(r"\bnew\s+Function\s*\(", re.I),
+    re.compile(r"javascript\s*:", re.I),
+    re.compile(r"<script[^>]+src\s*=\s*['\"]https?://", re.I),
+)
 
 
 class CodeWorkspaceError(ValueError):
@@ -69,6 +75,38 @@ def _read_text(path):
         return raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise CodeWorkspaceError("non_utf8_file") from exc
+
+
+def _validate_workspace(root):
+    root = Path(root)
+    index = root / "index.html"
+    if not index.is_file():
+        raise CodeWorkspaceError("index_required")
+    files = [path for path in root.rglob("*") if path.is_file()]
+    if len(files) > _MAX_FILES:
+        raise CodeWorkspaceError("too_many_files")
+    for path in files:
+        rel = path.relative_to(root).as_posix()
+        _normalize_path(rel)
+        content = _read_text(path)
+        if path.suffix.lower() in {".html", ".htm", ".js", ".mjs"}:
+            if any(pattern.search(content) for pattern in _BLOCKED_CODE_PATTERNS):
+                raise CodeWorkspaceError(f"unsafe_code_pattern:{rel}")
+        if path.suffix.lower() in {".js", ".mjs"}:
+            try:
+                result = subprocess.run(
+                    ["node", "--check", str(path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                    check=False,
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+                raise CodeWorkspaceError("javascript_validator_unavailable") from exc
+            if result.returncode != 0:
+                detail = (result.stderr or result.stdout or "JavaScript syntax error")[-1200:]
+                raise CodeWorkspaceError(f"javascript_syntax_error:{rel}:{detail}")
+    return True
 
 
 def bootstrap_workspace(project):
@@ -184,11 +222,7 @@ def apply_changes(project, files, deleted_files=None):
         for path in normalized_deletes:
             target, _ = _target(stage_root, path)
             target.unlink(missing_ok=True)
-        if not (stage_root / "index.html").is_file():
-            raise CodeWorkspaceError("index_required")
-        actual_files = [p for p in stage_root.rglob("*") if p.is_file()]
-        if len(actual_files) > _MAX_FILES:
-            raise CodeWorkspaceError("too_many_files")
+        _validate_workspace(stage_root)
         backup = _root(project) / "previous"
         if backup.exists():
             shutil.rmtree(backup)
@@ -208,6 +242,7 @@ def apply_changes(project, files, deleted_files=None):
 
 def deploy_workspace_preview(project):
     source = bootstrap_workspace(project)
+    _validate_workspace(source)
     preview = Path(settings.APP_DATA_ROOT) / "preview" / project.slug
     staging = Path(settings.APP_DATA_ROOT) / "preview" / f".{project.slug}-code-staging"
     if staging.exists():
