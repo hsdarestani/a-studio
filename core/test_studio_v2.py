@@ -41,6 +41,20 @@ class SourceImportSafetyTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["backend_features"], ["auth", "database"])
 
+    def test_legacy_project_payload_gets_v2_defaults(self):
+        form = ProjectCreateForm(
+            data={
+                "name": "Legacy Demo",
+                "business_type": "Services",
+                "description": "Created by an older companion client",
+                "language": "de",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["source_type"], "prompt")
+        self.assertEqual(form.cleaned_data["builder_mode"], "safe_pwa")
+        self.assertEqual(form.cleaned_data["source_url"], "")
+
 
 class StudioV2ModelTests(TestCase):
     def setUp(self):
