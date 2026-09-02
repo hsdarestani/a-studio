@@ -9,3 +9,4 @@ requests>=2.32,<3
 PyJWT>=2.10,<3
 cryptography>=45,<47
 django-allauth[socialaccount]>=65.18,<66
+qrcode>=8.2,<9
