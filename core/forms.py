@@ -54,7 +54,7 @@ class ProjectCreateForm(forms.ModelForm):
     BACKEND_CHOICES = [
         ("auth", _("Authentication — managed & available")),
         ("database", _("Database — managed & available")),
-        ("storage", _("File storage — architecture ready")),
+        ("storage", _("File storage — managed & available")),
         ("push", _("Push notifications — architecture ready")),
         ("subscriptions", _("Subscriptions / paywall — architecture ready")),
     ]
@@ -63,7 +63,7 @@ class ProjectCreateForm(forms.ModelForm):
         choices=BACKEND_CHOICES,
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        help_text=_("Authentication and owner-scoped database are live in A+ Managed Backend. Other selections are included in the product architecture for the next integration layer."),
+        help_text=_("Authentication, owner-scoped database and private file storage are live in A+ Managed Backend. Push and subscriptions stay architecture-ready until their external providers are configured."),
     )
 
     class Meta:
