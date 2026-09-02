@@ -29,6 +29,16 @@
     </div>
 
     <div class="side-block"><small>{% trans "PREVIEW" %}</small><a href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener">{% trans "Open preview" %} ↗</a></div>
+    <div class="v2-phone-qr">
+      <div class="v2-phone-qr-copy">
+        <small>{% trans "PHONE PREVIEW" %}</small>
+        <b>{% trans "Scan on your phone" %}</b>
+        <span>{% trans "Opens this exact preview version in the browser. This is a PWA preview, not an Expo/native build." %}</span>
+      </div>
+      <a href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener" class="v2-phone-qr-image" aria-label="{% trans 'Open preview on phone' %}">
+        <img src="{% url 'preview_qr' project.id %}?v={{ project.version }}" alt="{% trans 'QR code for phone preview' %}" loading="lazy">
+      </a>
+    </div>
     <div class="side-block"><small>{% trans "PRODUCTION" %}</small>{% if project.status == 'live' %}<a href="{{ project.live_url }}" target="_blank" rel="noopener">{% trans "Open live app" %} ↗</a>{% else %}<span>{% trans "Not published yet" %}</span>{% endif %}</div>
     <div class="side-block"><small>{% trans "DESIRED SUBDOMAIN" %}</small><span>{{ project.desired_domain }}</span><em>{% trans "Requires wildcard DNS to this server." %}</em></div>
     <div class="side-block"><small>{% trans "SOURCE" %}</small>{% if project.repo_url %}<a href="{{ project.repo_url }}" target="_blank" rel="noopener">{% trans "Open private repository" %} ↗</a>{% else %}<span>{% trans "Internal source workspace" %}</span><em>{% trans "Add GitHub runtime credentials to provision customer repositories." %}</em>{% endif %}</div>

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.apple",
     "core",
+    "managed_backend",
 ]
 
 MIDDLEWARE = [
@@ -186,6 +187,11 @@ BILLING_CONTACT_EMAIL = env("BILLING_CONTACT_EMAIL", "app@aplus-solution.de")
 GITHUB_TOKEN = env("GITHUB_TOKEN")
 GITHUB_OWNER = env("GITHUB_OWNER", "hsdarestani")
 GITHUB_REPOSITORY_PREFIX = env("GITHUB_REPOSITORY_PREFIX", "astudio-app-")
+
+# Managed backend tokens authenticate end users of generated customer apps,
+# not A+ Studio dashboard users. Use a dedicated value in production when possible.
+MANAGED_BACKEND_SIGNING_KEY = env("MANAGED_BACKEND_SIGNING_KEY", SECRET_KEY)
+MANAGED_BACKEND_TOKEN_TTL = int(env("MANAGED_BACKEND_TOKEN_TTL", "604800"))
 
 # Studio V2 Code Agent never executes generated code in this Django/Celery host.
 # When enabled, jobs are HMAC-signed and sent to a separately isolated sandbox service.

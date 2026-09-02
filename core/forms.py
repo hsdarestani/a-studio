@@ -52,18 +52,18 @@ class SignUpForm(UserCreationForm):
 
 class ProjectCreateForm(forms.ModelForm):
     BACKEND_CHOICES = [
-        ("auth", _("Authentication")),
-        ("database", _("Database")),
-        ("storage", _("File storage")),
-        ("push", _("Push notifications")),
-        ("subscriptions", _("Subscriptions / paywall")),
+        ("auth", _("Authentication — managed & available")),
+        ("database", _("Database — managed & available")),
+        ("storage", _("File storage — architecture ready")),
+        ("push", _("Push notifications — architecture ready")),
+        ("subscriptions", _("Subscriptions / paywall — architecture ready")),
     ]
     backend_features = forms.MultipleChoiceField(
         label=_("Backend kit"),
         choices=BACKEND_CHOICES,
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        help_text=_("Tell the builder which managed backend capabilities the product needs."),
+        help_text=_("Authentication and owner-scoped database are live in A+ Managed Backend. Other selections are included in the product architecture for the next integration layer."),
     )
 
     class Meta:
@@ -126,5 +126,8 @@ class ProjectCreateForm(forms.ModelForm):
             raise forms.ValidationError(str(exc)) from exc
 
     def clean_backend_features(self):
-        allowed = {value for value, _label in self.BACKEND_CHOICES}
-        return [item for item in self.cleaned_data.get("backend_features", []) if item in allowed]
+        allowed = [value for value, _label in self.BACKEND_CHOICES]
+        requested = [item for item in self.cleaned_data.get("backend_features", []) if item in allowed]
+        if any(item in requested for item in ("database", "storage", "push", "subscriptions")) and "auth" not in requested:
+            requested.insert(0, "auth")
+        return [item for item in allowed if item in requested]
