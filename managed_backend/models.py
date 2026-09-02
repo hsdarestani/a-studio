@@ -21,7 +21,7 @@ class AppUser(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["project", "email"], name="unique_managed_user_email_per_project")
         ]
-        indexes = [models.Index(fields=["project", "active"])]
+        indexes = [models.Index(fields=["project", "active"], name="mb_user_project_active_idx")]
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
@@ -53,7 +53,10 @@ class AppRecord(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["project", "collection", "owner", "-created_at"]),
+            models.Index(
+                fields=["project", "collection", "owner", "-created_at"],
+                name="mb_record_owner_collection_idx",
+            ),
         ]
         ordering = ["-created_at"]
 
