@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import legal_views, mobile_api, views, workflow_views
+from . import legal_views, mobile_api, sandbox_views, views, workflow_views
 
 urlpatterns = [
     path("", views.landing, name="landing"),
@@ -37,6 +37,10 @@ urlpatterns = [
         name="mobile_store_submission",
     ),
     path("api/mobile/account/delete/", mobile_api.account_delete, name="mobile_account_delete"),
+
+    # Isolated Code Agent service callback. The endpoint is CSRF-exempt but
+    # authenticates the raw request body with a shared HMAC signature.
+    path("api/sandbox/runs/<uuid:run_id>/callback/", sandbox_views.sandbox_callback, name="sandbox_callback"),
 
     path("dashboard/", views.dashboard, name="dashboard"),
     path("projects/new/", views.project_create, name="project_create"),
