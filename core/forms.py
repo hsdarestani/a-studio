@@ -90,6 +90,7 @@ class ProjectCreateForm(forms.ModelForm):
         widgets = {
             "description": forms.Textarea(attrs={"rows": 5, "placeholder": _("Describe the business, target users and what the app should do.")}),
             "language": forms.Select(choices=[("de", "Deutsch"), ("en", "English")]),
+            "source_type": forms.RadioSelect,
             "source_url": forms.URLInput(attrs={"placeholder": "https://github.com/company/project or https://example.com"}),
         }
         help_texts = {
