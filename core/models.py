@@ -57,6 +57,15 @@ class Project(TimeStampedModel):
         ("paused", "Paused"),
         ("error", "Error"),
     ]
+    BUILDER_MODE_CHOICES = [
+        ("safe_pwa", "Safe PWA Builder"),
+        ("code_agent", "Code Agent"),
+    ]
+    SOURCE_TYPE_CHOICES = [
+        ("prompt", "Start from a prompt"),
+        ("github", "Import from GitHub"),
+        ("url", "Build from a website URL"),
+    ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="projects")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_studio_projects")
@@ -65,6 +74,12 @@ class Project(TimeStampedModel):
     business_type = models.CharField(max_length=120)
     description = models.TextField()
     language = models.CharField(max_length=10, default="de")
+    builder_mode = models.CharField(max_length=24, choices=BUILDER_MODE_CHOICES, default="safe_pwa")
+    source_type = models.CharField(max_length=16, choices=SOURCE_TYPE_CHOICES, default="prompt")
+    source_url = models.URLField(blank=True, max_length=1000)
+    source_metadata = models.JSONField(default=dict, blank=True)
+    source_imported_at = models.DateTimeField(null=True, blank=True)
+    backend_features = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="draft")
     app_spec = models.JSONField(default=dict, blank=True)
     repo_url = models.URLField(blank=True)
@@ -203,3 +218,37 @@ class StoreSubmission(TimeStampedModel):
     eligibility_report = models.JSONField(default=dict, blank=True)
     quoted_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     external_reference = models.CharField(max_length=255, blank=True)
+
+
+class SandboxRun(TimeStampedModel):
+    KIND_CHOICES = [
+        ("import", "Import"),
+        ("build", "Build"),
+        ("test", "Test"),
+        ("preview", "Preview"),
+    ]
+    STATUS_CHOICES = [
+        ("queued", "Queued"),
+        ("starting", "Starting"),
+        ("running", "Running"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("blocked", "Blocked"),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="sandbox_runs")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES, default="build")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="queued")
+    runtime = models.CharField(max_length=80, default="node20")
+    image = models.CharField(max_length=255, blank=True)
+    workspace_path = models.CharField(max_length=500, blank=True)
+    network_policy = models.CharField(max_length=32, default="restricted")
+    cpu_limit_millis = models.PositiveIntegerField(default=1000)
+    memory_limit_mb = models.PositiveIntegerField(default=768)
+    timeout_seconds = models.PositiveIntegerField(default=300)
+    command = models.JSONField(default=list, blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    log = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)

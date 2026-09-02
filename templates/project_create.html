@@ -2,14 +2,124 @@
 {% load i18n %}
 {% block title %}{% trans "New app" %} — A+ Studio{% endblock %}
 {% block content %}
-<main class="narrow-shell">
+<main class="v2-create-shell">
   <a class="back-link" href="{% url 'dashboard' %}">← {% trans "Back to projects" %}</a>
-  <section class="create-card">
-    <div class="eyebrow dark">{% trans "NEW AI APP PROJECT" %}</div><h1>{% trans "What should we build?" %}</h1><p>{% trans "Give us the business context and desired outcome. The first version is generated automatically; you can refine everything through chat." %}</p>
-    <form method="post" class="form-stack large-form">{% csrf_token %}{{ form.as_p }}
-      <div class="form-note"><b>{% trans "What happens next?" %}</b><span>{% trans "Private workspace → PWA generation → automated checks → safe preview" %}</span></div>
-      <button class="button full">{% trans "Create project and first preview" %}</button>
-    </form>
+
+  <section class="v2-create-hero">
+    <div>
+      <div class="eyebrow dark">A+ STUDIO V2</div>
+      <h1>{% trans "Start with an idea, a repo or a website." %}</h1>
+      <p>{% trans "Studio imports useful context, builds in isolation and keeps production untouched until you approve the preview." %}</p>
+    </div>
+    <div class="v2-badge-row">
+      <span class="v2-badge">Prompt → App</span>
+      <span class="v2-badge">GitHub Import</span>
+      <span class="v2-badge">URL Import</span>
+      <span class="v2-badge">Backend Kit</span>
+    </div>
   </section>
+
+  <form method="post" class="v2-builder-form" id="studio-v2-create">{% csrf_token %}
+    <div class="v2-form-main">
+      <section class="v2-panel">
+        <h2>{% trans "1. Choose the starting point" %}</h2>
+        <p>{% trans "Import an existing product context or begin from a clean prompt." %}</p>
+        {% if form.source_type.errors %}<div class="v2-error">{{ form.source_type.errors }}</div>{% endif %}
+        <div class="v2-source-options">
+          {% for radio in form.source_type %}
+          <div class="v2-source-option">
+            {{ radio.tag }}
+            <label for="{{ radio.id_for_label }}">
+              <b>{{ radio.choice_label }}</b>
+              {% if radio.data.value == 'prompt' %}
+              <span>{% trans "Describe the product and let Studio create the first structure." %}</span>
+              {% elif radio.data.value == 'github' %}
+              <span>{% trans "Read repository metadata and key project files before building." %}</span>
+              {% else %}
+              <span>{% trans "Analyze a public website and use its useful business context as reference." %}</span>
+              {% endif %}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="v2-field" id="source-url-field" style="margin-top:14px">
+          <label for="{{ form.source_url.id_for_label }}">{{ form.source_url.label }}</label>
+          {{ form.source_url }}
+          {% if form.source_url.help_text %}<span class="v2-help">{{ form.source_url.help_text }}</span>{% endif %}
+          {% if form.source_url.errors %}<span class="v2-error">{{ form.source_url.errors|striptags }}</span>{% endif %}
+        </div>
+      </section>
+
+      <section class="v2-panel">
+        <h2>{% trans "2. Define the product" %}</h2>
+        <p>{% trans "This becomes the product brief used for the first build and future conversations." %}</p>
+        <div class="v2-grid-2">
+          <div class="v2-field">
+            <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+            {{ form.name }}
+            {% if form.name.errors %}<span class="v2-error">{{ form.name.errors|striptags }}</span>{% endif %}
+          </div>
+          <div class="v2-field">
+            <label for="{{ form.business_type.id_for_label }}">{{ form.business_type.label }}</label>
+            {{ form.business_type }}
+            {% if form.business_type.errors %}<span class="v2-error">{{ form.business_type.errors|striptags }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="v2-field" style="margin-top:14px">
+          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+          {{ form.description }}
+          {% if form.description.errors %}<span class="v2-error">{{ form.description.errors|striptags }}</span>{% endif %}
+        </div>
+        <div class="v2-grid-2" style="margin-top:14px">
+          <div class="v2-field">
+            <label for="{{ form.language.id_for_label }}">{{ form.language.label }}</label>
+            {{ form.language }}
+          </div>
+          <div class="v2-field">
+            <label for="{{ form.builder_mode.id_for_label }}">{{ form.builder_mode.label }}</label>
+            {{ form.builder_mode }}
+            {% if form.builder_mode.help_text %}<span class="v2-help">{{ form.builder_mode.help_text }}</span>{% endif %}
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-panel v2-check-grid">
+        <h2>{% trans "3. Backend kit" %}</h2>
+        <p>{% trans "Select capabilities the product architecture should be ready for. These requirements are included in the builder context from the first build." %}</p>
+        {{ form.backend_features }}
+        {% if form.backend_features.errors %}<span class="v2-error">{{ form.backend_features.errors|striptags }}</span>{% endif %}
+      </section>
+    </div>
+
+    <aside class="v2-form-side">
+      <div class="v2-side-card">
+        <div class="eyebrow">{% trans "BUILD PIPELINE" %}</div>
+        <h3>{% trans "What happens after Create" %}</h3>
+        <div class="v2-flow">
+          <div class="v2-flow-step"><i>1</i><div><b>{% trans "Source intake" %}</b><span>{% trans "Prompt, GitHub context or safe website extraction." %}</span></div></div>
+          <div class="v2-flow-step"><i>2</i><div><b>{% trans "AI architecture" %}</b><span>{% trans "Business brief and backend requirements become one build context." %}</span></div></div>
+          <div class="v2-flow-step"><i>3</i><div><b>{% trans "Isolated preview" %}</b><span>{% trans "The generated version is separated from production." %}</span></div></div>
+          <div class="v2-flow-step"><i>4</i><div><b>{% trans "Approval gate" %}</b><span>{% trans "Nothing goes live until you explicitly publish it." %}</span></div></div>
+        </div>
+        <button class="button full" type="submit">{% trans "Create project" %} →</button>
+        <div class="v2-security-note">{% trans "Website imports block local/private network targets. Code Agent is exposed only when an isolated sandbox worker is configured." %}</div>
+      </div>
+    </aside>
+  </form>
 </main>
+<script>
+(function(){
+  const field=document.getElementById('source-url-field');
+  const radios=[...document.querySelectorAll('input[name="source_type"]')];
+  function sync(){
+    const chosen=radios.find(r=>r.checked);
+    const show=chosen && chosen.value!=='prompt';
+    field.style.display=show?'flex':'none';
+    const input=field.querySelector('input');
+    if(input) input.required=!!show;
+  }
+  radios.forEach(r=>r.addEventListener('change',sync));
+  sync();
+})();
+</script>
 {% endblock %}

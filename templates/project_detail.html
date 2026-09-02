@@ -12,18 +12,36 @@
     <a class="back-link" href="{% url 'dashboard' %}">← {% trans "All projects" %}</a>
     <div class="project-identity"><div class="app-avatar large">{{ project.name|slice:':1'|upper }}</div><div><h1>{{ project.name }}</h1><span>{{ project.business_type }}</span></div></div>
     <div class="project-state"><span class="status {{ project.status }}">{% include "partials/project_status.html" %}</span><span>{% trans "Version" %} {{ project.version }}</span></div>
+
+    <div class="v2-workspace-summary">
+      <small>A+ STUDIO V2</small>
+      <div class="v2-builder-mode">{{ project.get_builder_mode_display }}</div>
+      <div class="v2-source-meta">
+        <span>{{ project.get_source_type_display }}</span>
+        {% if project.source_imported_at %}<span class="v2-import-chip ready">{% trans "Imported" %}</span>{% endif %}
+      </div>
+      {% if project.source_url %}<a href="{{ project.source_url }}" target="_blank" rel="noopener" style="display:block;margin-top:8px;font-size:.72rem;word-break:break-all">{{ project.source_url }} ↗</a>{% endif %}
+      {% if project.backend_features %}
+      <div class="v2-capabilities" style="margin-top:9px">
+        {% for feature in project.backend_features %}<span class="v2-capability">{{ feature }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
     <div class="side-block"><small>{% trans "PREVIEW" %}</small><a href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener">{% trans "Open preview" %} ↗</a></div>
     <div class="side-block"><small>{% trans "PRODUCTION" %}</small>{% if project.status == 'live' %}<a href="{{ project.live_url }}" target="_blank" rel="noopener">{% trans "Open live app" %} ↗</a>{% else %}<span>{% trans "Not published yet" %}</span>{% endif %}</div>
     <div class="side-block"><small>{% trans "DESIRED SUBDOMAIN" %}</small><span>{{ project.desired_domain }}</span><em>{% trans "Requires wildcard DNS to this server." %}</em></div>
     <div class="side-block"><small>{% trans "SOURCE" %}</small>{% if project.repo_url %}<a href="{{ project.repo_url }}" target="_blank" rel="noopener">{% trans "Open private repository" %} ↗</a>{% else %}<span>{% trans "Internal source workspace" %}</span><em>{% trans "Add GitHub runtime credentials to provision customer repositories." %}</em>{% endif %}</div>
-    <div class="side-actions"><a href="{% url 'download_build' project.id %}" class="secondary-button">{% trans "Download PWA" %}</a><a href="{% url 'export_spec' project.id %}" class="secondary-button">{% trans "Export app specification" %}</a></div>
+    <div class="side-actions">
+      {% if project.builder_mode == 'safe_pwa' %}<a href="{% url 'download_build' project.id %}" class="secondary-button">{% trans "Download PWA" %}</a><a href="{% url 'export_spec' project.id %}" class="secondary-button">{% trans "Export app specification" %}</a>{% elif project.repo_url %}<a href="{{ project.repo_url }}" class="secondary-button" target="_blank" rel="noopener">{% trans "Open code repository" %} ↗</a>{% endif %}
+    </div>
     <form method="post" action="{% url 'publish_project' project.id %}">{% csrf_token %}<button class="button full" {% if project.status != 'preview' and project.status != 'live' %}disabled{% endif %}>{% trans "Publish approved preview" %}</button></form>
     <form method="post" action="{% url 'request_store_submission' project.id %}" class="store-request">{% csrf_token %}<select name="platform"><option value="both">{% trans "iOS + Android" %}</option><option value="android">{% trans "Android only" %}</option><option value="ios">{% trans "iOS only" %}</option></select><button class="secondary-button">{% trans "Request store publishing" %}</button></form>
   </aside>
   <section class="builder-panel">
-    <header class="builder-header"><div><span class="live-dot"></span><b>A+ AI Builder</b><small>{% trans "Changes are built in preview first" %}</small></div><div class="credit-chip compact"><span>{% trans "Credits" %}</span><b id="credits-count">{{ organization.credits }}</b></div></header>
+    <header class="builder-header"><div><span class="live-dot"></span><b>{% if project.builder_mode == 'code_agent' %}A+ Code Agent{% else %}A+ AI Builder{% endif %}</b><small>{% trans "Changes are built in preview first" %}</small></div><div class="credit-chip compact"><span>{% trans "Credits" %}</span><b id="credits-count">{{ organization.credits }}</b></div></header>
     <div id="chat-stream" class="chat-stream">
-      <div class="chat-intro"><div class="ai-orb">A+</div><h2>{% trans "Build" %} {{ project.name }} {% trans "by chatting." %}</h2><p>{% trans "Ask for pages, booking flows, product cards, loyalty, forms, multilingual content, visual changes or a complete restructuring. Production remains untouched until you publish." %}</p></div>
+      <div class="chat-intro"><div class="ai-orb">A+</div><h2>{% trans "Build" %} {{ project.name }} {% trans "by chatting." %}</h2><p>{% if project.builder_mode == 'code_agent' %}{% trans "Code Agent jobs run in the isolated sandbox with resource limits and signed callbacks. Production remains untouched until approval." %}{% else %}{% trans "Ask for pages, booking flows, product cards, loyalty, forms, multilingual content, visual changes or a complete restructuring. Production remains untouched until you publish." %}{% endif %}</p></div>
       {% for item in chat_messages %}
       <article class="chat-message {{ item.role }}" data-message-id="{{ item.id }}">
         <div class="message-author">{% if item.role == 'assistant' %}A+ Builder{% else %}{% trans "You" %}{% endif %}</div>
@@ -42,6 +60,9 @@
     <div class="preview-toolbar"><span>{% trans "Interactive preview" %}</span><a href="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" target="_blank" rel="noopener">{% trans "Open full size" %} ↗</a></div>
     <div class="device-frame"><div class="device-notch"></div><iframe id="preview-frame" src="{{ project.preview_url }}?preview=1&amp;v={{ project.version }}" loading="eager" title="{{ project.name }} {% trans "preview" %}"></iframe></div>
     <section class="deployment-list"><h3>{% trans "Recent deployments" %}</h3>{% for deploy in deployments %}<div><span class="deploy-dot {{ deploy.status }}"></span><b>{% include "partials/deployment_environment.html" %} v{{ deploy.version }}</b><small>{% include "partials/deployment_status.html" %} · {{ deploy.created_at|timesince }} {% trans "ago" %}</small></div>{% empty %}<p>{% trans "No deployments yet." %}</p>{% endfor %}</section>
+    {% if sandbox_runs %}
+    <section class="deployment-list"><h3>{% trans "Sandbox activity" %}</h3><div class="v2-sandbox-list">{% for run in sandbox_runs %}<div class="v2-sandbox-item"><span><b>{{ run.get_kind_display }}</b> · {{ run.runtime }}</span><span>{{ run.get_status_display }}</span></div>{% endfor %}</div></section>
+    {% endif %}
   </aside>
 </main>
 {% endblock %}

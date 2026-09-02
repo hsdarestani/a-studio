@@ -186,3 +186,14 @@ BILLING_CONTACT_EMAIL = env("BILLING_CONTACT_EMAIL", "app@aplus-solution.de")
 GITHUB_TOKEN = env("GITHUB_TOKEN")
 GITHUB_OWNER = env("GITHUB_OWNER", "hsdarestani")
 GITHUB_REPOSITORY_PREFIX = env("GITHUB_REPOSITORY_PREFIX", "astudio-app-")
+
+# Studio V2 Code Agent never executes generated code in this Django/Celery host.
+# When enabled, jobs are HMAC-signed and sent to a separately isolated sandbox service.
+CODE_AGENT_ENABLED = env("CODE_AGENT_ENABLED", "0") == "1"
+CODE_SANDBOX_ENDPOINT = env("CODE_SANDBOX_ENDPOINT").rstrip("/")
+CODE_SANDBOX_SHARED_SECRET = env("CODE_SANDBOX_SHARED_SECRET")
+CODE_SANDBOX_RUNTIME = env("CODE_SANDBOX_RUNTIME", "node20")
+CODE_SANDBOX_IMAGE = env("CODE_SANDBOX_IMAGE", "")
+CODE_SANDBOX_CPU_MILLIS = int(env("CODE_SANDBOX_CPU_MILLIS", "1000"))
+CODE_SANDBOX_MEMORY_MB = int(env("CODE_SANDBOX_MEMORY_MB", "768"))
+CODE_SANDBOX_TIMEOUT_SECONDS = int(env("CODE_SANDBOX_TIMEOUT_SECONDS", "300"))

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.db import transaction
-from .models import AuditEvent, Conversation, CreditTransaction, Deployment, FeatureRequest, Membership, Message, Organization, Project, StoreSubmission
+from .models import AuditEvent, Conversation, CreditTransaction, Deployment, FeatureRequest, Membership, Message, Organization, Project, SandboxRun, StoreSubmission
 
 admin.site.site_header = "A+ Studio Operations"
 admin.site.site_title = "A+ Studio Operations"
@@ -15,9 +15,18 @@ class OrganizationAdmin(admin.ModelAdmin):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("name", "organization", "status", "language", "version", "updated_at")
-    list_filter = ("status", "language", "business_type")
-    search_fields = ("name", "slug", "description", "desired_domain")
+    list_display = ("name", "organization", "status", "builder_mode", "source_type", "language", "version", "updated_at")
+    list_filter = ("status", "builder_mode", "source_type", "language", "business_type")
+    search_fields = ("name", "slug", "description", "source_url", "desired_domain")
+
+
+@admin.register(SandboxRun)
+class SandboxRunAdmin(admin.ModelAdmin):
+    list_display = ("project", "kind", "status", "runtime", "memory_limit_mb", "timeout_seconds", "created_at")
+    list_filter = ("status", "kind", "runtime", "network_policy")
+    search_fields = ("project__name", "workspace_path", "log")
+    readonly_fields = ("created_at", "updated_at", "started_at", "finished_at")
+    ordering = ("-created_at",)
 
 
 @admin.register(StoreSubmission)
