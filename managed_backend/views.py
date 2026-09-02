@@ -2,17 +2,19 @@ import json
 import re
 from urllib.parse import urlparse
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 
 from core.models import Project
 
-from .models import AppRecord, AppUser
+from .models import AppFile, AppRecord, AppUser
 from .security import active_features, allow_attempt, authenticate_token, bearer_token, issue_token, user_payload
+from .storage import delete_storage_key, resolve_storage_key, save_upload
 
 
 _COLLECTION = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
@@ -32,8 +34,6 @@ def _origin_value(url):
 
 
 def _allowed_origins(project):
-    from django.conf import settings
-
     values = {
         _origin_value(settings.APP_PUBLIC_URL),
         _origin_value(project.preview_url),
@@ -122,6 +122,20 @@ def _record_payload(record):
     }
 
 
+def _file_payload(project, item):
+    return {
+        "id": str(item.id),
+        "name": item.original_name,
+        "content_type": item.content_type,
+        "size": item.size,
+        "sha256": item.sha256,
+        "metadata": item.metadata,
+        "created_at": item.created_at.isoformat(),
+        "download_path": f"/files/{item.id}/download/",
+        "download_url": f"{settings.APP_PUBLIC_URL}/api/apps/{project.slug}/files/{item.id}/download/",
+    }
+
+
 @csrf_exempt
 def config(request, slug):
     project = _project(slug)
@@ -130,16 +144,22 @@ def config(request, slug):
     if request.method != "GET":
         return _reply(request, project, {"error": "method_not_allowed"}, status=405)
     requested = [str(item) for item in (project.backend_features or [])]
+    features = active_features(project)
     return _reply(
         request,
         project,
         {
             "api_version": 1,
             "project": project.slug,
-            "features": active_features(project),
+            "features": features,
             "requested_features": requested,
-            "auth": {"mode": "email_password"} if "auth" in active_features(project) else None,
-            "database": {"scope": "owner", "max_records_per_page": 100} if "database" in active_features(project) else None,
+            "auth": {"mode": "email_password"} if "auth" in features else None,
+            "database": {"scope": "owner", "max_records_per_page": 100} if "database" in features else None,
+            "storage": {
+                "scope": "owner",
+                "max_bytes": int(getattr(settings, "MANAGED_STORAGE_MAX_BYTES", 10 * 1024 * 1024)),
+                "active_content_blocked": True,
+            } if "storage" in features else None,
         },
     )
 
@@ -283,3 +303,93 @@ def record_detail(request, slug, collection, record_id):
         record.delete()
         return _reply(request, project, {"deleted": True})
     return _reply(request, project, {"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def files(request, slug):
+    project = _project(slug)
+    if request.method == "OPTIONS":
+        return _reply(request, project, {}, status=204)
+    blocked = _require_feature(request, project, "storage")
+    if blocked:
+        return blocked
+    user = _user_from_request(request, project)
+    if not user:
+        return _reply(request, project, {"error": "unauthorized"}, status=401)
+
+    if request.method == "GET":
+        queryset = AppFile.objects.filter(project=project, owner=user)[:100]
+        return _reply(request, project, {"files": [_file_payload(project, item) for item in queryset]})
+    if request.method != "POST":
+        return _reply(request, project, {"error": "method_not_allowed"}, status=405)
+    if not allow_attempt(project, request, "upload", limit=30, window_seconds=300):
+        return _reply(request, project, {"error": "rate_limited"}, status=429)
+    upload = request.FILES.get("file")
+    if upload is None:
+        return _reply(request, project, {"error": "file_required"}, status=400)
+    try:
+        file_id, storage_key, original_name, content_type, size, sha256 = save_upload(project, user, upload)
+    except ValueError as exc:
+        return _reply(request, project, {"error": str(exc)}, status=400)
+    try:
+        item = AppFile.objects.create(
+            id=file_id,
+            project=project,
+            owner=user,
+            storage_key=storage_key,
+            original_name=original_name,
+            content_type=content_type,
+            size=size,
+            sha256=sha256,
+        )
+    except Exception:
+        delete_storage_key(storage_key)
+        raise
+    return _reply(request, project, {"file": _file_payload(project, item)}, status=201)
+
+
+@csrf_exempt
+def file_detail(request, slug, file_id):
+    project = _project(slug)
+    if request.method == "OPTIONS":
+        return _reply(request, project, {}, status=204)
+    blocked = _require_feature(request, project, "storage")
+    if blocked:
+        return blocked
+    user = _user_from_request(request, project)
+    if not user:
+        return _reply(request, project, {"error": "unauthorized"}, status=401)
+    item = get_object_or_404(AppFile, pk=file_id, project=project, owner=user)
+    if request.method == "GET":
+        return _reply(request, project, {"file": _file_payload(project, item)})
+    if request.method == "DELETE":
+        storage_key = item.storage_key
+        item.delete()
+        delete_storage_key(storage_key)
+        return _reply(request, project, {"deleted": True})
+    return _reply(request, project, {"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def file_download(request, slug, file_id):
+    project = _project(slug)
+    if request.method == "OPTIONS":
+        return _reply(request, project, {}, status=204)
+    blocked = _require_feature(request, project, "storage")
+    if blocked:
+        return blocked
+    if request.method != "GET":
+        return _reply(request, project, {"error": "method_not_allowed"}, status=405)
+    user = _user_from_request(request, project)
+    if not user:
+        return _reply(request, project, {"error": "unauthorized"}, status=401)
+    item = get_object_or_404(AppFile, pk=file_id, project=project, owner=user)
+    try:
+        path = resolve_storage_key(item.storage_key)
+    except ValueError:
+        return _reply(request, project, {"error": "file_unavailable"}, status=404)
+    if not path.is_file():
+        return _reply(request, project, {"error": "file_unavailable"}, status=404)
+    response = FileResponse(path.open("rb"), content_type=item.content_type, as_attachment=True, filename=item.original_name)
+    response["Content-Length"] = str(item.size)
+    return _cors(response, request, project)
