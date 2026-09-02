@@ -11,5 +11,6 @@ urlpatterns = [
     path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("accounts/signup/", views.signup, name="signup"),
     path("accounts/", include("allauth.urls")),
+    path("api/apps/", include("managed_backend.urls")),
     path("", include("core.urls")),
 ]
