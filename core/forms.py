@@ -99,15 +99,27 @@ class ProjectCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        code_agent_ready = bool(getattr(settings, "CODE_AGENT_ENABLED", False) and getattr(settings, "CODE_SANDBOX_ENDPOINT", ""))
+        self.fields["source_type"].required = False
+        self.fields["builder_mode"].required = False
+        self.fields["source_type"].initial = self.initial.get("source_type", "prompt")
+        self.fields["builder_mode"].initial = self.initial.get("builder_mode", "safe_pwa")
+        code_agent_ready = bool(getattr(settings, "CODE_AGENT_ENABLED", False) and getattr(settings, "CODE_SANDBOX_ENDPOINT", "") and getattr(settings, "CODE_SANDBOX_SHARED_SECRET", ""))
         if not code_agent_ready:
             self.fields["builder_mode"].choices = [("safe_pwa", _("Safe PWA Builder"))]
             self.fields["builder_mode"].help_text = _("Code Agent appears automatically after the isolated sandbox worker is configured.")
         else:
             self.fields["builder_mode"].help_text = _("Code Agent runs generated code only in the isolated sandbox service, never on the Studio web server.")
 
+    def clean_source_type(self):
+        return self.cleaned_data.get("source_type") or "prompt"
+
+    def clean_builder_mode(self):
+        value = self.cleaned_data.get("builder_mode") or "safe_pwa"
+        allowed = {str(item[0]) for item in self.fields["builder_mode"].choices}
+        return value if value in allowed else "safe_pwa"
+
     def clean_source_url(self):
-        source_type = self.cleaned_data.get("source_type", "prompt")
+        source_type = self.cleaned_data.get("source_type") or "prompt"
         try:
             return normalize_source_url(self.cleaned_data.get("source_url", ""), source_type)
         except SourceImportError as exc:
