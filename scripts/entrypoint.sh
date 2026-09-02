@@ -1,10 +1,15 @@
 #!/bin/sh
 set -eu
 
-python manage.py migrate --noinput
-python manage.py collectstatic --noinput
+if [ "${RUN_MIGRATIONS:-0}" = "1" ]; then
+  python manage.py migrate --noinput
+fi
 
-if [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
+if [ "${RUN_COLLECTSTATIC:-0}" = "1" ]; then
+  python manage.py collectstatic --noinput
+fi
+
+if [ "${RUN_BOOTSTRAP_ADMIN:-0}" = "1" ] && [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
   python manage.py shell <<'PY'
 import os
 from django.contrib.auth import get_user_model
