@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .models import Conversation, Message, Project, StoreSubmission
 from .tasks import notify_store_submission, process_chat_message
+from .v3_tasks import process_code_chat_message
 
 
 def _project_for(user, pk):
@@ -84,9 +85,10 @@ def chat_submit(request, pk):
         role="assistant",
         content=_("Request queued. A+ Builder is preparing the build."),
         status="queued",
-        metadata={"progress": {"stage": "queued", "percent": 5}},
+        metadata={"progress": {"stage": "queued", "percent": 5}, "builder_mode": project.builder_mode},
     )
-    task = process_chat_message.delay(str(user_message.id), str(assistant.id), request.user.id)
+    task_fn = process_code_chat_message if project.builder_mode == "code_agent" else process_chat_message
+    task = task_fn.delay(str(user_message.id), str(assistant.id), request.user.id)
     assistant.task_id = task.id
     assistant.save(update_fields=["task_id", "updated_at"])
     return JsonResponse({"task_id": task.id, "assistant_message_id": str(assistant.id)})

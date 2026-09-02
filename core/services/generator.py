@@ -175,7 +175,7 @@ def generate_preview(project):
     checksum = hashlib.sha256(
         "".join(
             path.read_text(encoding="utf-8")
-            for path in sorted(root.glob("*"))
+            for path in sorted(root.rglob("*"))
             if path.is_file()
         ).encode()
     ).hexdigest()
@@ -203,7 +203,7 @@ def publish_project(project):
     checksum = hashlib.sha256(
         "".join(
             path.read_text(encoding="utf-8")
-            for path in sorted(target.glob("*"))
+            for path in sorted(target.rglob("*"))
             if path.is_file()
         ).encode()
     ).hexdigest()

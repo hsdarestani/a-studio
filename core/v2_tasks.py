@@ -1,11 +1,14 @@
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
 from .models import AuditEvent, Deployment, Message, Project
 from .services.ai import propose_change
+from .services.code_agent import apply_code_change, propose_code_change
+from .services.github import sync_project_repository
 from .services.provisioning import provision_project
-from .services.sandbox import dispatch_code_agent
+from .services.sandbox import dispatch_code_agent, sandbox_ready
 from .services.source_import import SourceImportError, context_for_prompt, import_source_context
 
 
@@ -23,7 +26,7 @@ def _backend_requirements(project):
 def _build_instructions(project, metadata):
     imported_context = context_for_prompt(metadata)
     mode_instruction = (
-        "Create the complete first version as a real code project. Use a maintainable application structure, validate the build and return a preview URL through the sandbox callback."
+        "Create the complete first version as a real code project. Use a maintainable application structure, validate the web preview, and implement the requested product flows instead of describing them."
         if project.builder_mode == "code_agent"
         else f"Create the complete first version of this PWA for a {project.business_type} business."
     )
@@ -74,25 +77,51 @@ def import_and_provision_initial_project(self, project_id):
         if project.builder_mode == "code_agent":
             project.status = "building"
             project.save(update_fields=["status", "updated_at"])
-            run = dispatch_code_agent(
-                project=project,
-                requested_by=project.created_by,
-                instructions=instructions,
-                deployment_id=deployment.id,
-            )
+            if sandbox_ready():
+                run = dispatch_code_agent(
+                    project=project,
+                    requested_by=project.created_by,
+                    instructions=instructions,
+                    deployment_id=deployment.id,
+                )
+                with translation.override(_project_language(project)):
+                    Message.objects.create(
+                        conversation=project.conversation,
+                        role="assistant",
+                        content=_("Code Agent is building this project inside the isolated executable sandbox. Production is untouched while the build, tests and preview are prepared."),
+                        metadata={
+                            "action": "code_agent_running",
+                            "sandbox_run_id": str(run.id),
+                            "source_type": project.source_type,
+                            "backend_features": project.backend_features,
+                        },
+                    )
+                return {"status": "sandbox_running", "sandbox_run_id": str(run.id)}
+
+            proposal = propose_code_change(project, instructions, [])
+            if proposal.get("action") != "apply":
+                raise RuntimeError(proposal.get("message") or "Code Agent could not create the initial workspace")
+            result = apply_code_change(project, proposal)
+            if settings.GITHUB_TOKEN:
+                sync_project_repository(project, result["root"])
+            project.status = "preview"
+            project.last_build_error = ""
+            project.save(update_fields=["status", "last_build_error", "updated_at"])
+            deployment.mark_success(project.preview_url, result["checksum"])
             with translation.override(_project_language(project)):
                 Message.objects.create(
                     conversation=project.conversation,
                     role="assistant",
-                    content=_("Code Agent is building this project inside the isolated sandbox. Production is untouched while the build, tests and preview are prepared."),
+                    content=_("Your real-code workspace is ready. Chat changes now edit the source files directly, create revision snapshots and rebuild the live preview."),
                     metadata={
-                        "action": "code_agent_running",
-                        "sandbox_run_id": str(run.id),
+                        "action": "code_preview_ready",
+                        "preview_url": project.preview_url,
                         "source_type": project.source_type,
                         "backend_features": project.backend_features,
+                        "changed_files": result.get("files_changed", []),
                     },
                 )
-            return {"status": "sandbox_running", "sandbox_run_id": str(run.id)}
+            return {"status": "success", "preview_url": project.preview_url, "mode": "code_workspace"}
 
         result = propose_change(project, instructions, [])
         if result.get("action") == "apply":

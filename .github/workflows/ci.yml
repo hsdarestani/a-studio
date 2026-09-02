@@ -37,6 +37,7 @@ jobs:
         run: |
           cat core/services/runtime-1.js core/services/runtime-2.js core/services/runtime-3.js > /tmp/a-studio-runtime.js
           node --check /tmp/a-studio-runtime.js
+          node --check static/studio-v3.js
       - name: Compile Python
         run: python -m compileall -q .
       - name: Validate Caddy configuration

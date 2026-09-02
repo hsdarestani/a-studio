@@ -18,7 +18,7 @@ def ensure_project_repository(project):
         return project.repo_url
     name = f"{settings.GITHUB_REPOSITORY_PREFIX}{project.slug}"[:100]
     owner = settings.GITHUB_OWNER
-    payload = {"name": name, "description": f"Generated PWA for {project.name}", "private": True, "auto_init": True}
+    payload = {"name": name, "description": f"Generated application for {project.name}", "private": True, "auto_init": True}
     endpoint = f"{API}/orgs/{owner}/repos" if _is_organization(owner) else f"{API}/user/repos"
     response = requests.post(endpoint, headers=_headers(), json=payload, timeout=30)
     if response.status_code not in {201, 422}:
@@ -51,8 +51,14 @@ def _put_file(repo, path, content, message):
 
 def sync_project_repository(project, build_root):
     ensure_project_repository(project)
-    _put_file(project.repo_name, "app-spec.json", json.dumps(project.app_spec, ensure_ascii=False, indent=2), f"Update app specification v{project.version}")
+    if project.app_spec:
+        _put_file(project.repo_name, "app-spec.json", json.dumps(project.app_spec, ensure_ascii=False, indent=2), f"Update app specification v{project.version}")
     _put_file(project.repo_name, "README.md", f"# {project.name}\n\nGenerated and managed by A+ Studio.\n\nLive: {project.live_url}\n", "Update project documentation")
-    for path in Path(build_root).iterdir():
-        if path.is_file():
-            _put_file(project.repo_name, f"public/{path.name}", path.read_text(encoding="utf-8"), f"Build v{project.version}: {path.name}")
+    build_root = Path(build_root)
+    for path in sorted(p for p in build_root.rglob("*") if p.is_file()):
+        rel = path.relative_to(build_root).as_posix()
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        _put_file(project.repo_name, f"public/{rel}", content, f"Build v{project.version}: {rel}")
