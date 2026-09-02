@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import legal_views, mobile_api, sandbox_views, views, workflow_views
+from . import legal_views, mobile_api, preview_views, sandbox_views, views, workflow_views
 
 urlpatterns = [
     path("", views.landing, name="landing"),
@@ -46,6 +46,7 @@ urlpatterns = [
     path("projects/new/", views.project_create, name="project_create"),
     path("projects/<uuid:pk>/", views.project_detail, name="project_detail"),
     path("projects/<uuid:pk>/status/", views.project_status, name="project_status"),
+    path("projects/<uuid:pk>/preview-qr.svg", preview_views.preview_qr, name="preview_qr"),
     path("projects/<uuid:pk>/chat/", workflow_views.chat_submit, name="chat_submit"),
     path(
         "projects/<uuid:pk>/messages/<uuid:message_id>/",
