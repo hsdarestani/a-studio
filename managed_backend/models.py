@@ -21,7 +21,9 @@ class AppUser(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["project", "email"], name="unique_managed_user_email_per_project")
         ]
-        indexes = [models.Index(fields=["project", "active"], name="mb_user_project_active_idx")]
+        indexes = [
+            models.Index(fields=["project", "active"], name="mb_user_project_active_idx"),
+        ]
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
