@@ -1,5 +1,4 @@
 from django import forms
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import gettext_lazy as _
@@ -103,12 +102,13 @@ class ProjectCreateForm(forms.ModelForm):
         self.fields["builder_mode"].required = False
         self.fields["source_type"].initial = self.initial.get("source_type", "prompt")
         self.fields["builder_mode"].initial = self.initial.get("builder_mode", "safe_pwa")
-        code_agent_ready = bool(getattr(settings, "CODE_AGENT_ENABLED", False) and getattr(settings, "CODE_SANDBOX_ENDPOINT", "") and getattr(settings, "CODE_SANDBOX_SHARED_SECRET", ""))
-        if not code_agent_ready:
-            self.fields["builder_mode"].choices = [("safe_pwa", _("Safe PWA Builder"))]
-            self.fields["builder_mode"].help_text = _("Code Agent appears automatically after the isolated sandbox worker is configured.")
-        else:
-            self.fields["builder_mode"].help_text = _("Code Agent runs generated code only in the isolated sandbox service, never on the Studio web server.")
+        self.fields["builder_mode"].choices = [
+            ("safe_pwa", _("Safe PWA Builder")),
+            ("code_agent", _("Code Agent V3 — real code workspace")),
+        ]
+        self.fields["builder_mode"].help_text = _(
+            "Code Agent V3 edits real HTML/CSS/JavaScript files with revision snapshots and live preview. Executable framework builds use the isolated sandbox when configured."
+        )
 
     def clean_source_type(self):
         return self.cleaned_data.get("source_type") or "prompt"
