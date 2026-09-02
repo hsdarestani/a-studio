@@ -1,10 +1,18 @@
 import hashlib
+import html
 import json
 import shutil
 from pathlib import Path
 from django.conf import settings
-from .ai import sanitize_spec
 from managed_backend.security import active_features
+from .ai import sanitize_spec
+
+
+RUNTIME_DIR = Path(__file__).resolve().parent
+
+
+def _safe(value):
+    return html.escape(str(value or ""), quote=True)
 
 
 def _write(path, content):
@@ -12,20 +20,107 @@ def _write(path, content):
     path.write_text(content, encoding="utf-8")
 
 
-def _runtime_source():
+def _runtime_asset(name):
+    return (RUNTIME_DIR / name).read_text(encoding="utf-8")
+
+
+def _icon_svg(primary, accent):
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{_safe(primary)}"/><stop offset="1" stop-color="{_safe(accent)}"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/><path d="M154 342 256 142l102 200h-58l-17-38h-55l25-52h8l-5-12-52 102z" fill="white"/></svg>'''
+
+
+def _index_html(spec, version, slug):
+    app, brand = spec["app"], spec["brand"]
+    title = _safe(app.get("title"))
+    direction = "rtl" if app.get("direction") == "rtl" else "ltr"
+    language = _safe(app.get("language", "de"))
+    version = str(version)
+    cache_prefix = f"astudio-{slug}-"
+    runtime_config = (
+        "window.APP_BUILD_VERSION = "
+        + json.dumps(version)
+        + "; window.APP_CACHE_PREFIX = "
+        + json.dumps(cache_prefix)
+        + ";"
+    )
+    return f'''<!doctype html>
+<html lang="{language}" dir="{direction}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="{_safe(brand.get('primary'))}">
+  <meta name="description" content="{_safe(app.get('tagline'))}">
+  <link rel="manifest" href="manifest.webmanifest?v={version}">
+  <link rel="icon" href="icon.svg?v={version}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg?v={version}">
+  <link rel="stylesheet" href="styles.css?v={version}">
+  <title>{title}</title>
+</head>
+<body>
+  <div id="app" class="app-shell" aria-live="polite"></div>
+  <noscript>This app needs JavaScript enabled.</noscript>
+  <script>{runtime_config}</script>
+  <script src="config.js?v={version}"></script>
+  <script src="app.js?v={version}"></script>
+</body>
+</html>'''
+
+
+def _styles(spec):
+    brand = spec["brand"]
+    variables = (
+        ":root{"
+        f"--primary:{brand.get('primary')};"
+        f"--accent:{brand.get('accent')};"
+        f"--bg:{brand.get('background')};"
+        f"--surface:{brand.get('surface')};"
+        f"--text:{brand.get('text')};"
+        "--muted:#667085;"
+        "--line:rgba(127,127,127,.16);"
+        "--success:#16a66a;"
+        "--radius:24px;"
+        "--shadow:0 20px 60px rgba(17,24,39,.12)"
+        "}\n"
+    )
+    return variables + _runtime_asset("runtime.css")
+
+
+def _app_js():
     return "\n".join(
-        (Path(__file__).parent / name).read_text(encoding="utf-8")
+        _runtime_asset(name)
         for name in ("runtime-1.js", "runtime-2.js", "runtime-3.js")
     )
 
 
-def _runtime_css():
-    return (Path(__file__).parent / "runtime.css").read_text(encoding="utf-8")
+def _service_worker(project):
+    version = str(project.version)
+    prefix = f"astudio-{project.slug}-"
+    cache_name = f"{prefix}v{version}"
+    assets = [
+        "./",
+        "index.html",
+        f"styles.css?v={version}",
+        f"app.js?v={version}",
+        f"config.js?v={version}",
+        f"manifest.webmanifest?v={version}",
+        f"icon.svg?v={version}",
+    ]
+    return (
+        "const P="
+        + json.dumps(prefix)
+        + ";const C="
+        + json.dumps(cache_name)
+        + ";const A="
+        + json.dumps(assets)
+        + ";"
+        "self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(A))));"
+        "self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.startsWith(P)&&x!==C).map(x=>caches.delete(x))))));"
+        "self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('index.html'))));});"
+    )
 
 
 def _runtime_spec(project):
     spec = sanitize_spec(project.app_spec)
-    requested = [str(item) for item in (project.backend_features or []) if item]
+    requested = [str(item) for item in (project.backend_features or [])]
     spec["backend"] = {
         "api_version": 1,
         "api_base": f"{settings.APP_PUBLIC_URL}/api/apps/{project.slug}",
@@ -35,53 +130,21 @@ def _runtime_spec(project):
     return spec
 
 
-def _html(project):
-    spec = _runtime_spec(project)
-    title = spec["app"]["title"].replace("<", "&lt;").replace(">", "&gt;")
-    tagline = spec["app"]["tagline"].replace("<", "&lt;").replace(">", "&gt;")
-    language = spec["app"].get("language", "de")
-    direction = spec["app"].get("direction", "ltr")
-    spec_json = json.dumps(spec, ensure_ascii=False).replace("</", "<\\/")
-    return f"""<!doctype html>
-<html lang="{language}" dir="{direction}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="{spec['brand']['primary']}">
-<meta name="description" content="{tagline}">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css">
-<title>{title}</title>
-</head>
-<body>
-<div id="app"></div>
-<script>window.APP_SPEC={spec_json};window.APP_BUILD_VERSION={project.version};window.APP_CACHE_PREFIX={json.dumps(project.slug)};</script>
-<script src="app.js"></script>
-</body>
-</html>"""
-
-
-def _icon_svg(primary, accent):
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{primary}"/><stop offset="1" stop-color="{accent}"/></linearGradient></defs><rect width="512" height="512" rx="118" fill="url(#g)"/><path d="M144 338 232 126h50l87 212h-53l-20-53h-82l-20 53h-50Zm88-99h47l-23-64-24 64Z" fill="white"/><path d="M354 132h26v47h47v26h-47v47h-26v-47h-47v-26h47v-47Z" fill="white"/></svg>"""
-
-
-def _service_worker(project):
-    cache = f"{project.slug}-v{project.version}"
-    return f"""const CACHE={json.dumps(cache)};const ASSETS=['./','index.html','styles.css','app.js','manifest.webmanifest','icon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(r=>{{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r;}}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./'))));}});"""
-
-
 def generate_preview(project):
     spec = _runtime_spec(project)
-    project.app_spec = sanitize_spec(project.app_spec)
-    project.save(update_fields=["app_spec", "updated_at"])
     root = Path(settings.APP_DATA_ROOT) / "preview" / project.slug
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True, exist_ok=True)
-    _write(root / "index.html", _html(project))
-    _write(root / "styles.css", _runtime_css())
-    _write(root / "app.js", _runtime_source())
+    _write(root / "index.html", _index_html(spec, project.version, project.slug))
+    _write(root / "styles.css", _styles(spec))
+    _write(root / "app.js", _app_js())
+    _write(
+        root / "config.js",
+        "window.APP_SPEC = "
+        + json.dumps(spec, ensure_ascii=False).replace("</", "<\\/")
+        + ";",
+    )
     _write(
         root / "icon.svg",
         _icon_svg(spec["brand"]["primary"], spec["brand"]["accent"]),
