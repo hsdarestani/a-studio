@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates libpq5 gettext && rm -rf /var/lib/apt/lists/*
+    curl ca-certificates libpq5 gettext nodejs && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
