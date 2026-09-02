@@ -9,13 +9,13 @@ from django.utils import timezone
 from .models import AppUser
 
 
-SUPPORTED_FEATURES = ("auth", "database")
+SUPPORTED_FEATURES = ("auth", "database", "storage")
 
 
 def active_features(project):
     requested = [str(item) for item in (project.backend_features or [])]
     active = [item for item in SUPPORTED_FEATURES if item in requested]
-    if "database" in active and "auth" not in active:
+    if any(item in active for item in ("database", "storage")) and "auth" not in active:
         active.insert(0, "auth")
     return active
 

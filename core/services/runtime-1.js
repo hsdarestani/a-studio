@@ -15,7 +15,8 @@ const copy = lang.startsWith('de') ? {
   saved:'Gespeichert', explorer:'Entdecker', curator:'Kurator', expert:'Kenner',
   login:'Anmelden', signup:'Konto erstellen', logout:'Abmelden', email:'E-Mail', password:'Passwort', name:'Name',
   signedIn:'Angemeldet als', authNeeded:'Bitte melde dich an, um Daten sicher zu speichern.',
-  savedRemote:'Sicher gespeichert.', requestFailed:'Das hat nicht funktioniert. Bitte erneut versuchen.'
+  savedRemote:'Sicher gespeichert.', requestFailed:'Das hat nicht funktioniert. Bitte erneut versuchen.',
+  uploading:'Datei wird sicher hochgeladen…'
 } : {
   home:'Home', quiz:'Quiz', results:'Results', profile:'Profile', favorites:'Favorites', account:'Account',
   install:'Install', start:'Start quiz', back:'Back', next:'Next', finish:'Show results',
@@ -26,7 +27,8 @@ const copy = lang.startsWith('de') ? {
   saved:'Saved', explorer:'Explorer', curator:'Curator', expert:'Connoisseur',
   login:'Log in', signup:'Create account', logout:'Log out', email:'Email', password:'Password', name:'Name',
   signedIn:'Signed in as', authNeeded:'Please sign in to store data securely.',
-  savedRemote:'Saved securely.', requestFailed:'That did not work. Please try again.'
+  savedRemote:'Saved securely.', requestFailed:'That did not work. Please try again.',
+  uploading:'Uploading file securely…'
 };
 const quiz = sections.find(section => section.type === 'recommendation_quiz');
 const hero = sections.find(section => section.type === 'hero') || {};
@@ -35,6 +37,7 @@ const backendFeatures = new Set(items(backend.features).map(String));
 const backendBase = String(backend.api_base || '').replace(/\/+$/,'');
 const hasAuth = backendFeatures.has('auth') && !!backendBase;
 const hasDatabase = backendFeatures.has('database') && !!backendBase;
+const hasStorage = backendFeatures.has('storage') && !!backendBase;
 const storageKey = `astudio:${String(app.title || 'app').toLowerCase().replace(/[^a-z0-9]+/g,'-')}:state-v2`;
 const tokenKey = `${storageKey}:backend-token`;
 const blankState = {view:'home', step:0, answers:{}, profile:{}, results:[], favorites:[], xp:0, backendProfile:null};
@@ -57,13 +60,21 @@ function clearBackendSession(){ setBackendSession('', null); }
 async function backendRequest(path, options={}){
   if(!backendBase) throw new Error('backend_unavailable');
   const headers = {...(options.headers || {})};
-  if(options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if(options.body && !isFormData && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   if(backendToken) headers.Authorization = `Bearer ${backendToken}`;
   const response = await fetch(`${backendBase}${path}`, {...options, headers});
-  const payload = await response.json().catch(() => ({}));
+  const contentType = String(response.headers.get('content-type') || '');
+  const payload = contentType.includes('application/json') ? await response.json().catch(() => ({})) : {};
   if(response.status === 401 && backendToken) clearBackendSession();
   if(!response.ok) throw new Error(payload.error || `http_${response.status}`);
   return payload;
+}
+async function uploadManagedFile(file){
+  if(!hasStorage || !(file instanceof File) || !file.size) return null;
+  const body = new FormData(); body.append('file', file, file.name);
+  const payload = await backendRequest('/files/', {method:'POST', body});
+  return payload.file || null;
 }
 function collectionName(value, fallback){
   const clean = String(value || fallback || 'submissions').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
@@ -80,16 +91,26 @@ function levelInfo(){
   if(xp >= 350) return {number:2, label:copy.curator};
   return {number:1, label:copy.explorer};
 }
+function formFieldMarkup(field){
+  const type = String(field.type || 'text').toLowerCase();
+  const name = esc(field.name || field.label);
+  const required = field.required ? 'required' : '';
+  if(type === 'file'){
+    const accept = esc(field.accept || 'image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv');
+    return `<label>${esc(field.label)}<input name="${name}" type="file" accept="${accept}" ${required}></label>`;
+  }
+  return `<label>${esc(field.label)}<input name="${name}" type="${esc(type)}" ${required}></label>`;
+}
 function standardSection(section, index){
   const id = esc(section.id || section.type || `section-${index}`);
   const title = section.title ? `<h2>${esc(section.title)}</h2>` : '';
   if(['services','products'].includes(section.type)) return `<section id="${id}">${title}<div class="grid">${items(section.items).map(item => `<article class="card"><span class="pill">${esc(item.category || (section.type === 'products' ? 'Product' : 'Service'))}</span><h3>${esc(item.title)}</h3><p>${esc(item.text || item.description)}</p>${item.price ? `<div class="price">${esc(item.price)}</div>` : ''}</article>`).join('')}</div></section>`;
-  if(section.type === 'booking') return `<section id="${id}">${title}<p>${esc(section.text || '')}</p><form class="booking" data-local-form data-backend-collection="${esc(collectionName(section.collection,'bookings'))}"><label>${esc(section.name_label || 'Name')}<input name="name" required></label><label>${esc(section.service_label || 'Service')}<select name="service">${items(section.services).map(item => `<option>${esc(item.title || item)}</option>`).join('')}</select></label><label>${esc(section.date_label || 'Preferred date')}<input name="date" type="date" required></label><button class="primary-button">${esc(section.button || 'Request appointment')}</button></form></section>`;
+  if(section.type === 'booking') return `<section id="${id}">${title}<p>${esc(section.text || '')}</p><form class="booking" data-local-form data-backend-collection="${esc(collectionName(section.collection,'bookings'))}"><label>${esc(section.name_label || 'Name')}<input name="name" required></label><label>${esc(section.service_label || 'Service')}<select name="service">${items(section.services).map(item => `<option>${esc(item.title || item)}</option>`).join('')}</select></label><label>${esc(section.date_label || 'Preferred date')}<input name="date" type="date" required></label>${items(section.fields).map(formFieldMarkup).join('')}<button class="primary-button">${esc(section.button || 'Request appointment')}</button></form></section>`;
   if(section.type === 'gallery') return `<section id="${id}">${title}<div class="gallery">${items(section.items).map((item,n) => `<div class="gallery-item" aria-label="${esc(item.title || `Image ${n+1}`)}">${esc(item.emoji || '✦')}</div>`).join('')}</div></section>`;
   if(section.type === 'testimonials') return `<section id="${id}">${title}<div class="grid">${items(section.items).map(item => `<blockquote class="card"><p>“${esc(item.text)}”</p><strong>${esc(item.name)}</strong></blockquote>`).join('')}</div></section>`;
   if(section.type === 'faq') return `<section id="${id}" class="faq">${title}${items(section.items).map(item => `<details><summary>${esc(item.question)}</summary><p>${esc(item.answer)}</p></details>`).join('')}</section>`;
   if(section.type === 'loyalty') return `<section id="${id}">${title}<div class="card"><span class="pill">${esc(section.label || 'Member benefits')}</span><h3>${esc(section.headline || 'Your loyalty card')}</h3><p>${esc(section.text || '')}</p><div class="price">${esc(section.points || '0 points')}</div></div></section>`;
-  if(section.type === 'form') return `<section id="${id}">${title}<form class="contact-form" data-local-form data-backend-collection="${esc(collectionName(section.collection,'submissions'))}">${items(section.fields).map(field => `<label>${esc(field.label)}<input name="${esc(field.name || field.label)}" type="${esc(field.type || 'text')}" ${field.required ? 'required' : ''}></label>`).join('')}<button class="primary-button">${esc(section.button || 'Send')}</button></form></section>`;
+  if(section.type === 'form') return `<section id="${id}">${title}<form class="contact-form" data-local-form data-backend-collection="${esc(collectionName(section.collection,'submissions'))}">${items(section.fields).map(formFieldMarkup).join('')}<button class="primary-button">${esc(section.button || 'Send')}</button></form></section>`;
   if(section.type === 'contact') return `<section id="${id}">${title}<div class="grid"><div class="card"><h3>${esc(section.company || app.title)}</h3><p>${esc(section.address || '')}</p>${section.phone ? `<p><a href="tel:${esc(section.phone)}">${esc(section.phone)}</a></p>` : ''}${section.email ? `<p><a href="mailto:${esc(section.email)}">${esc(section.email)}</a></p>` : ''}</div></div></section>`;
   return `<section id="${id}" class="${section.type === 'notice' ? 'notice' : ''}">${title}<p>${esc(section.text || section.description || '')}</p></section>`;
 }

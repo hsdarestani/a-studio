@@ -58,6 +58,29 @@ async function handleBackendAuth(form, path){
     if(button) button.disabled = false;
   }
 }
+async function managedFormPayload(form){
+  const output = {};
+  for(const [key,value] of new FormData(form).entries()){
+    if(typeof File !== 'undefined' && value instanceof File){
+      if(!value.size) continue;
+      if(!hasStorage) throw new Error('storage_not_enabled');
+      toast(copy.uploading);
+      const uploaded = await uploadManagedFile(value);
+      output[key] = uploaded ? {
+        file_id: uploaded.id,
+        name: uploaded.name,
+        content_type: uploaded.content_type,
+        size: uploaded.size,
+        download_path: uploaded.download_path
+      } : null;
+    }else if(Object.prototype.hasOwnProperty.call(output,key)){
+      output[key] = Array.isArray(output[key]) ? [...output[key], value] : [output[key], value];
+    }else{
+      output[key] = value;
+    }
+  }
+  return output;
+}
 function bind(){
   document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => {state.view=button.dataset.view;saveState();render();}));
   document.querySelectorAll('[data-action="start-quiz"]').forEach(button => button.addEventListener('click', () => {state.view='quiz';state.step=Math.min(Object.keys(state.answers || {}).length,Math.max(0,items(quiz?.questions).length-1));saveState();render();}));
@@ -68,13 +91,16 @@ function bind(){
   document.querySelectorAll('[data-favorite]').forEach(button => button.addEventListener('click', () => {const id=button.dataset.favorite,current=new Set(items(state.favorites));current.has(id)?current.delete(id):current.add(id);state.favorites=[...current];saveState();toast(copy.saved);render();}));
   document.querySelectorAll('[data-local-form]').forEach(form => form.addEventListener('submit', async event => {
     event.preventDefault();
-    if(!hasDatabase){toast(lang.startsWith('de')?'Danke! Deine Anfrage wurde gespeichert.':'Thanks! Your request was saved.');form.reset();return;}
+    const needsRemote = hasDatabase || (hasStorage && !!form.querySelector('input[type="file"]'));
+    if(!needsRemote){toast(lang.startsWith('de')?'Danke! Deine Anfrage wurde gespeichert.':'Thanks! Your request was saved.');form.reset();return;}
     if(!backendToken){state.view='account';saveState();render();toast(copy.authNeeded);return;}
     const button=form.querySelector('button');if(button)button.disabled=true;
     try{
-      const data=Object.fromEntries(new FormData(form).entries());
-      const collection=collectionName(form.dataset.backendCollection,'submissions');
-      await backendRequest(`/records/${encodeURIComponent(collection)}/`,{method:'POST',body:JSON.stringify({data})});
+      const data=await managedFormPayload(form);
+      if(hasDatabase){
+        const collection=collectionName(form.dataset.backendCollection,'submissions');
+        await backendRequest(`/records/${encodeURIComponent(collection)}/`,{method:'POST',body:JSON.stringify({data})});
+      }
       toast(copy.savedRemote);form.reset();
     }catch(_){toast(copy.requestFailed);}finally{if(button)button.disabled=false;}
   }));
