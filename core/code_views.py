@@ -91,8 +91,6 @@ def code_file_save(request, pk):
     try:
         result = apply_changes(project, [{"path": path, "content": content}], [])
         root, checksum = deploy_workspace_preview(project)
-        if settings.GITHUB_TOKEN:
-            sync_project_repository(project, root)
         with transaction.atomic():
             locked = Project.objects.select_for_update().get(pk=project.pk)
             locked.version = max(locked.version + 1, next_version)
@@ -100,6 +98,12 @@ def code_file_save(request, pk):
             locked.last_build_error = ""
             locked.save(update_fields=["version", "status", "last_build_error", "updated_at"])
             project = locked
+        repo_sync_error = ""
+        if settings.GITHUB_TOKEN:
+            try:
+                sync_project_repository(project, root)
+            except Exception as exc:
+                repo_sync_error = str(exc)[:1000]
         feature = FeatureRequest.objects.create(
             project=project,
             requested_by=request.user,
@@ -115,9 +119,12 @@ def code_file_save(request, pk):
                 "changed_files": [path],
                 "files": list_files(project),
                 "snapshot": result.get("snapshot", ""),
+                "repo_sync_error": repo_sync_error,
             },
         )
         deployment.version = project.version
+        if repo_sync_error:
+            deployment.log = f"Preview succeeded; repository sync pending: {repo_sync_error}"
         deployment.mark_success(project.preview_url, checksum)
         return JsonResponse(
             {
@@ -126,6 +133,7 @@ def code_file_save(request, pk):
                 "preview_url": project.preview_url,
                 "feature_id": str(feature.id),
                 "changed_files": [path],
+                "repo_sync_error": repo_sync_error,
             }
         )
     except CodeWorkspaceError as exc:
