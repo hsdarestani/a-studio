@@ -211,9 +211,10 @@ def config(request):
             "mobile_purchases": False,
         },
         "legal": {
-            "privacy": f"{base}/privacy/",
-            "terms": f"{base}/terms/",
-            "support": f"{base}/support/",
+            "marketing": f"{base}/mobile/",
+            "privacy": f"{base}/mobile/privacy/",
+            "terms": f"{base}/mobile/terms/",
+            "support": f"{base}/mobile/support/",
             "account_deletion": f"{base}/account-deletion/",
         },
     })
