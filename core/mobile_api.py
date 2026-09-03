@@ -9,12 +9,14 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import FeatureRequest, Membership, Organization, Project, StoreSubmission
+from .forms import ProjectCreateForm
+from .models import Conversation, FeatureRequest, Membership, Organization, Project, StoreSubmission
+from .tasks import provision_initial_project
 
 User = get_user_model()
 TOKEN_SALT = "a-studio-mobile-v1"
 TOKEN_MAX_AGE = 60 * 60 * 24 * 7
-MOBILE_READ_ONLY_ERROR = "mobile_existing_projects_only"
+MOBILE_CLOUD_ONLY_ERROR = "mobile_cloud_builder_only"
 
 
 def _json_body(request):
@@ -120,15 +122,15 @@ def _project_for(user, pk):
 
 
 def _mobile_project_status(status):
-    """Expose neutral customer-project progress, not software lifecycle states."""
+    """Describe the server-side creation lifecycle without exposing a runnable preview."""
     return {
-        "draft": "planning",
-        "building": "active",
-        "preview": "review",
-        "live": "completed",
+        "draft": "queued",
+        "building": "generating",
+        "preview": "generated",
+        "live": "deployed",
         "paused": "paused",
         "error": "attention",
-    }.get(status, "active")
+    }.get(status, "generating")
 
 
 def _project_payload(project, *, detail=False):
@@ -138,6 +140,7 @@ def _project_payload(project, *, detail=False):
         "business_type": project.business_type,
         "language": project.language,
         "status": _mobile_project_status(project.status),
+        "version": project.version,
         "updated_at": project.updated_at.isoformat(),
     }
     if detail:
@@ -173,8 +176,8 @@ def login(request):
 
 @mobile_endpoint("POST")
 def signup(request):
-    """The iOS client is for invited/existing customer accounts only."""
-    return JsonResponse({"ok": False, "error": MOBILE_READ_ONLY_ERROR}, status=403)
+    """Account provisioning remains outside the iOS client."""
+    return JsonResponse({"ok": False, "error": "mobile_existing_accounts_only"}, status=403)
 
 
 def _user_payload(user):
@@ -197,16 +200,17 @@ def config(request):
         "ok": True,
         "app": "A+ Studio",
         "version": "1.0.0",
-        "mode": "customer_project_companion",
+        "mode": "cloud_app_builder",
         "capabilities": {
             "existing_account_access": True,
-            "existing_project_status": True,
+            "project_creation": True,
+            "cloud_app_generation": True,
             "project_requests": True,
             "account_registration": False,
-            "project_creation": False,
-            "store_status": False,
-            "code_execution": False,
+            "code_download": False,
+            "local_code_execution": False,
             "external_app_preview": False,
+            "store_status": False,
             "mobile_publishing": False,
             "mobile_purchases": False,
         },
@@ -238,8 +242,40 @@ def dashboard(request):
 
 @mobile_endpoint("POST", auth=True)
 def project_create(request):
-    """Project creation is intentionally unavailable in the iOS companion."""
-    return JsonResponse({"ok": False, "error": MOBILE_READ_ONLY_ERROR}, status=403)
+    """Create an app project and start generation on A+ Studio cloud infrastructure.
+
+    The generated application is never downloaded, installed, previewed, or
+    executed by the iOS client. The mobile client only sends project inputs and
+    reads server-side lifecycle state.
+    """
+    organization = _organization_for(request.mobile_user)
+    try:
+        payload = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+    payload = dict(payload)
+    payload.update({
+        "source_type": "prompt",
+        "source_url": "",
+        "builder_mode": "safe_pwa",
+        "backend_features": [],
+    })
+    form = ProjectCreateForm(payload)
+    if not form.is_valid():
+        return JsonResponse(
+            {"ok": False, "error": "invalid_project", "fields": form.errors.get_json_data()},
+            status=400,
+        )
+
+    project = form.save(commit=False)
+    project.organization = organization
+    project.created_by = request.mobile_user
+    project.status = "draft"
+    project.save()
+    Conversation.objects.get_or_create(project=project)
+    provision_initial_project.delay(str(project.id))
+    return JsonResponse({"ok": True, "project": _project_payload(project, detail=True)}, status=201)
 
 
 @mobile_endpoint("GET", auth=True)
@@ -252,7 +288,7 @@ def project_detail(request, pk):
 
 @mobile_endpoint("POST", auth=True)
 def chat(request, pk):
-    """Record a customer coordination request for human project-team review."""
+    """Record an app change request for the remote project workflow/team."""
     project = _project_for(request.mobile_user, pk)
     if not project:
         return JsonResponse({"ok": False, "error": "project_not_found"}, status=404)
@@ -267,7 +303,7 @@ def chat(request, pk):
     if len(content) > 12000:
         return JsonResponse({"ok": False, "error": "message_too_long"}, status=400)
 
-    title = content.splitlines()[0].strip()[:220] or "Project request"
+    title = content.splitlines()[0].strip()[:220] or "App change request"
     item = FeatureRequest.objects.create(
         project=project,
         requested_by=request.mobile_user,
@@ -298,12 +334,12 @@ def message_status(request, pk, message_id):
 
 @mobile_endpoint("POST", auth=True)
 def publish(request, pk):
-    return JsonResponse({"ok": False, "error": "not_available"}, status=404)
+    return JsonResponse({"ok": False, "error": MOBILE_CLOUD_ONLY_ERROR}, status=404)
 
 
 @mobile_endpoint("POST", auth=True)
 def request_store_submission(request, pk):
-    return JsonResponse({"ok": False, "error": "not_available"}, status=404)
+    return JsonResponse({"ok": False, "error": MOBILE_CLOUD_ONLY_ERROR}, status=404)
 
 
 def _delete_user_data(user):
