@@ -1,0 +1,28 @@
+{% extends "legal/base_legal.html" %}
+{% block title %}Datenschutz · A+ Studio Mobile{% endblock %}
+{% block content %}
+<div class="eyebrow">A+ STUDIO MOBILE · DATENSCHUTZ</div>
+<h1>Datenschutzerklärung für die Mobile-App</h1>
+<p>Stand: 3. September 2026. Diese Erklärung gilt ausschließlich für die A+ Studio Mobile-App und ihren mobilen Kundenbereich.</p>
+<div class="card">
+  <h2>Verantwortlicher</h2>
+  <p>{{ company_name }}<br>E-Mail: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+</div>
+<h2>Welche Daten verarbeitet werden</h2>
+<ul>
+  <li><strong>Konto- und Profildaten:</strong> E-Mail-Adresse, Name und die für die Anmeldung erforderlichen Sicherheitsinformationen.</li>
+  <li><strong>Bestehende Projektdaten:</strong> Name, Beschreibung und Fortschrittsstatus von Projekten, die dem Kundenkonto bereits zugeordnet wurden.</li>
+  <li><strong>Abstimmungsdaten:</strong> Fragen, Feedback und andere Textnachrichten, die Sie an das zuständige Projektteam senden.</li>
+  <li><strong>Technische Daten:</strong> notwendige Sicherheits-, Server- und Fehlerprotokolle sowie Zeitstempel für einen sicheren und zuverlässigen Betrieb.</li>
+</ul>
+<h2>Zwecke der Verarbeitung</h2>
+<p>Die Daten werden verwendet, um bestehende Kundenkonten zu authentifizieren, bereits zugeordnete Projekte mobil darzustellen, Abstimmungspunkte an das Projektteam zu übermitteln, Support bereitzustellen und den Dienst gegen Missbrauch zu schützen.</p>
+<h2>Weitergabe und Dienstleister</h2>
+<p>Daten werden nur verarbeitet oder an Dienstleister übermittelt, soweit dies für Hosting, technische Infrastruktur, E-Mail-Support, Sicherheit oder die Erfüllung der jeweiligen Kundenleistung erforderlich ist. Eine Nutzung zu Werbezwecken oder für Cross-App-Tracking findet in der Mobile-App nicht statt.</p>
+<h2>Speicherdauer</h2>
+<p>Kontodaten und personenbezogene Abstimmungsdaten werden nur so lange gespeichert, wie dies für den Kundenbereich, Support, Sicherheit oder gesetzliche Pflichten erforderlich ist. Bei einer Kontolöschung werden personenbezogene Daten gelöscht oder entkoppelt, soweit keine gesetzlichen oder berechtigten Aufbewahrungspflichten entgegenstehen.</p>
+<h2>Ihre Rechte</h2>
+<p>Sie können Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und – soweit einschlägig – Widerspruch verlangen. Kontakt: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>. Die Kontolöschung kann direkt in der App oder über die <a href="/account-deletion/">öffentliche Löschseite</a> gestartet werden.</p>
+<h2>Sicherheit</h2>
+<p>Die Übertragung erfolgt verschlüsselt über HTTPS. Zugangsdaten werden nicht öffentlich bereitgestellt. Die Mobile-App enthält keine Werbe-SDKs und kein Cross-App-Tracking.</p>
+{% endblock %}
