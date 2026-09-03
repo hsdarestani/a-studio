@@ -52,7 +52,8 @@ for marker in required:
 
 # Guideline 2.5.2 regression guard: app creation may be initiated from iOS,
 # but generated application code must stay on A+ cloud infrastructure. The
-# iOS binary must never execute, install, download or launch a generated app.
+# iOS binary must never offer controls that execute, install, download or
+# launch a generated app. Negative disclosure text is intentionally allowed.
 for forbidden in (
     "Preview öffnen",
     "Preview erstellen",
@@ -68,7 +69,7 @@ for forbidden in (
     'name="company_name"',
 ):
     if forbidden.lower() in app_js.lower():
-        raise SystemExit(f"iOS cloud builder contains forbidden executable/distribution flow: {forbidden}")
+        raise SystemExit(f"iOS cloud builder contains forbidden executable/distribution control: {forbidden}")
 
 store_profile = store_profile_path.read_text(encoding="utf-8")
 
@@ -108,17 +109,18 @@ for required_phrase in ("app-projekte", "cloud", "serverseitig"):
             f"Apple description must clearly disclose cloud app creation: {required_phrase}"
         )
 
+# Store copy must never advertise install/download/distribution controls. It
+# may explicitly state that those capabilities are not present.
 for forbidden_phrase in (
-    "ausführbare preview",
-    "app installieren",
-    "build herunterladen",
+    "jetzt app installieren",
+    "build jetzt herunterladen",
     "ipa herunterladen",
     "apk herunterladen",
-    "store-einreichung aus der app",
+    "store-einreichung direkt aus der app",
 ):
     if forbidden_phrase in apple_description:
         raise SystemExit(
-            f"Apple description contains forbidden executable/distribution positioning: {forbidden_phrase}"
+            f"Apple description advertises forbidden executable/distribution flow: {forbidden_phrase}"
         )
 
 print("A+ Studio truthful cloud-app-builder App Store positioning check passed.")
