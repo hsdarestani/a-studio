@@ -6,12 +6,20 @@ urlpatterns = [
     path("", views.landing, name="landing"),
     path("health/", views.health, name="health"),
 
-    # Public legal/support URLs used by App Store Connect and Google Play.
+    # Public legal/support URLs for the web service.
     path("privacy/", legal_views.privacy, name="privacy"),
     path("datenschutz/", legal_views.privacy, name="privacy_de"),
     path("terms/", legal_views.terms, name="terms"),
     path("nutzungsbedingungen/", legal_views.terms, name="terms_de"),
     path("support/", legal_views.support, name="support"),
+
+    # Dedicated App Store / mobile customer-area pages. Keep these isolated from
+    # the separate web product so App Review sees exactly the iOS feature set.
+    path("mobile/", legal_views.mobile_landing, name="mobile_landing"),
+    path("mobile/privacy/", legal_views.mobile_privacy, name="mobile_privacy"),
+    path("mobile/terms/", legal_views.mobile_terms, name="mobile_terms"),
+    path("mobile/support/", legal_views.mobile_support, name="mobile_support"),
+
     path("account-deletion/", legal_views.account_deletion, name="account_deletion"),
     path("konto-loeschen/", legal_views.account_deletion, name="account_deletion_de"),
 
