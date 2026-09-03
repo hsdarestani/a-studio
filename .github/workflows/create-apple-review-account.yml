@@ -13,7 +13,7 @@ permissions:
 jobs:
   provision:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -28,7 +28,7 @@ jobs:
           REVIEW_PASSWORD="$(python - <<'PY'
           import secrets, string
           alphabet = string.ascii_letters + string.digits
-          print('ASa!' + ''.join(secrets.choice(alphabet) for _ in range(22)))
+          print('ASa!' + ''.join(secrets.choice(alphabet) for _ in range(24)))
           PY
           )"
           echo "::add-mask::$REVIEW_PASSWORD"
@@ -37,7 +37,40 @@ jobs:
             echo "REVIEW_PASSWORD=$REVIEW_PASSWORD"
           } >> "$GITHUB_ENV"
 
-      - name: Create companion-only reviewer account
+      - name: Wait for customer-companion production API
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if body="$(curl -4 -fsS --connect-timeout 10 --max-time 20 https://studio.aplus-solution.de/api/mobile/config/ 2>/dev/null)" && \
+               python - "$body" <<'PY'
+          import json, sys
+          data=json.loads(sys.argv[1])
+          caps=data.get('capabilities') or {}
+          legal=data.get('legal') or {}
+          ok=(
+              data.get('mode')=='customer_project_companion'
+              and caps.get('project_creation') is False
+              and caps.get('account_registration') is False
+              and caps.get('external_app_preview') is False
+              and caps.get('mobile_publishing') is False
+              and str(legal.get('privacy','')).endswith('/mobile/privacy/')
+              and str(legal.get('support','')).endswith('/mobile/support/')
+          )
+          raise SystemExit(0 if ok else 1)
+          PY
+            then
+              curl -4 -fsS --connect-timeout 10 --max-time 20 https://studio.aplus-solution.de/mobile/privacy/ >/dev/null
+              curl -4 -fsS --connect-timeout 10 --max-time 20 https://studio.aplus-solution.de/mobile/support/ >/dev/null
+              echo 'customer_companion_api=ready'
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Customer-companion production API did not become ready.' >&2
+          exit 1
+
+      - name: Create reviewer account and save credentials in Publisher
         env:
           SSHPASS: ${{ secrets.PASS }}
           HOST: ${{ secrets.HOST }}
@@ -49,23 +82,17 @@ jobs:
           sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
             "REVIEW_EMAIL_B64='$email_b64' REVIEW_PASSWORD_B64='$password_b64' bash -s" <<'REMOTE'
           set -euo pipefail
-          cd /opt/a-studio/current
           export REVIEW_EMAIL="$(printf '%s' "$REVIEW_EMAIL_B64" | base64 -d)"
           export REVIEW_PASSWORD="$(printf '%s' "$REVIEW_PASSWORD_B64" | base64 -d)"
+
+          cd /opt/a-studio/current
           docker compose exec -T \
             -e REVIEW_EMAIL="$REVIEW_EMAIL" \
             -e REVIEW_PASSWORD="$REVIEW_PASSWORD" \
             web python manage.py shell <<'PY'
           import os
           from django.contrib.auth import get_user_model
-          from core.models import (
-              CreditTransaction,
-              FeatureRequest,
-              Membership,
-              Organization,
-              Project,
-              StoreSubmission,
-          )
+          from core.models import CreditTransaction, FeatureRequest, Membership, Organization, Project, StoreSubmission
 
           User = get_user_model()
           email = os.environ['REVIEW_EMAIL'].strip().lower()
@@ -90,7 +117,6 @@ jobs:
                   name='A+ Studio App Review',
                   owner=user,
                   billing_email=email,
-                  plan='starter',
                   credits=0,
               )
               Membership.objects.create(organization=organization, user=user, role='owner')
@@ -98,7 +124,6 @@ jobs:
           organization.name = 'A+ Studio App Review'
           organization.owner = user
           organization.billing_email = email
-          organization.plan = 'starter'
           organization.credits = 0
           organization.active = True
           organization.save()
@@ -109,23 +134,23 @@ jobs:
           project = Project.objects.create(
               organization=organization,
               created_by=user,
-              name='Luna Booking',
-              business_type='Friseursalon',
+              name='Standorteröffnung Westend',
+              business_type='Kundenprojekt',
               description=(
-                  'Projektbegleitung für eine Termin- und Kunden-App. '
-                  'Die iOS-App zeigt Projektstatus, Briefing, Änderungswünsche '
-                  'und vorhandenen Veröffentlichungsstatus nur zur Koordination.'
+                  'Koordination der nächsten Schritte für eine Standorteröffnung. '
+                  'Der mobile Kundenbereich zeigt den aktuellen Projektfortschritt '
+                  'und offene Abstimmungspunkte mit dem A+ Solution Projektteam.'
               ),
               language='de',
-              status='draft',
-              version=4,
+              status='building',
+              version=1,
           )
 
           FeatureRequest.objects.create(
               project=project,
               requested_by=user,
-              title='Buchungsablauf abstimmen',
-              description='Bitte die Anforderungen für die Wochenansicht und freie Termine mit dem Projektteam abstimmen.',
+              title='Nächsten Abstimmungstermin bestätigen',
+              description='Bitte den nächsten Abstimmungstermin für Donnerstag bestätigen.',
               size='custom',
               credits=0,
               status='proposed',
@@ -133,31 +158,41 @@ jobs:
           FeatureRequest.objects.create(
               project=project,
               requested_by=user,
-              title='Kontaktbereich geprüft',
-              description='Kontaktangaben und Öffnungszeiten wurden mit dem Projektteam abgestimmt.',
+              title='Standortangaben geprüft',
+              description='Die aktuellen Standortangaben wurden mit dem Projektteam abgestimmt.',
               size='custom',
               credits=0,
               status='done',
           )
-
-          StoreSubmission.objects.create(
-              project=project,
-              requested_by=user,
-              platform='ios',
-              status='review',
-              notes='Read-only distribution status shown in the iOS companion app.',
-              eligibility_report={'mobile_read_only': True},
-          )
+          StoreSubmission.objects.filter(project=project).delete()
 
           print('review_account=ready')
           print('workspace=' + organization.name)
           print('project=' + project.name)
-          print('project_status=' + project.status)
           print('credits=' + str(organization.credits))
+          PY
+
+          cd /opt/aplus-publisher
+          docker compose exec -T \
+            -e REVIEW_EMAIL="$REVIEW_EMAIL" \
+            -e REVIEW_PASSWORD="$REVIEW_PASSWORD" \
+            web python manage.py shell <<'PY'
+          import os
+          from apps.publisher.models import MobileApp
+
+          app = MobileApp.objects.get(slug='a-studio')
+          app.review_username = os.environ['REVIEW_EMAIL'].strip().lower()
+          app.set_review_password(os.environ['REVIEW_PASSWORD'])
+          app.requires_login = True
+          app.save(update_fields=['review_username','review_password_blob','requires_login','updated_at'])
+          if not app.get_review_password():
+              raise SystemExit('Publisher failed to persist App Review password.')
+          print('publisher_review_credentials=ready')
+          print('review_username=' + app.review_username)
           PY
           REMOTE
 
-      - name: Verify public companion review flow
+      - name: Verify reviewer flow and mobile boundaries
         shell: bash
         run: |
           set -euo pipefail
@@ -175,14 +210,14 @@ jobs:
           data = json.loads(sys.argv[1])
           if not data.get('ok') or not data.get('token'):
               raise SystemExit('Reviewer login verification failed')
-          user = data.get('user') or {}
-          org = user.get('organization') or {}
+          org = (data.get('user') or {}).get('organization') or {}
           for forbidden in ('credits', 'plan'):
               if forbidden in org:
-                  raise SystemExit(f'Forbidden mobile entitlement exposed: {forbidden}')
+                  raise SystemExit(f'Forbidden entitlement exposed: {forbidden}')
           print(data['token'])
           PY
           )"
+
           dashboard="$(curl -4 -fsS --connect-timeout 15 --max-time 30 \
             -H "Authorization: Bearer $token" \
             https://studio.aplus-solution.de/api/mobile/dashboard/)"
@@ -190,61 +225,47 @@ jobs:
           import json, sys
           data = json.loads(sys.argv[1])
           projects = data.get('projects') or []
-          if not data.get('ok') or not projects:
-              raise SystemExit('Reviewer dashboard has no project')
+          if not data.get('ok') or len(projects) != 1:
+              raise SystemExit('Reviewer dashboard must contain one assigned project')
           project = projects[0]
-          for forbidden in ('preview_url', 'live_url', 'repo_url', 'deployment'):
+          if project.get('status') != 'active':
+              raise SystemExit('Reviewer project must expose neutral active status')
+          for forbidden in ('preview_url','live_url','repo_url','deployment','store_submissions','change_requests'):
               if forbidden in project:
-                  raise SystemExit(f'Forbidden builder field exposed: {forbidden}')
+                  raise SystemExit(f'Forbidden mobile field exposed: {forbidden}')
           print(project['id'])
           PY
           )"
+
           detail="$(curl -4 -fsS --connect-timeout 15 --max-time 30 \
             -H "Authorization: Bearer $token" \
             "https://studio.aplus-solution.de/api/mobile/projects/$project_id/")"
           python - "$detail" <<'PY'
           import json, sys
-          data = json.loads(sys.argv[1])
-          project = data.get('project') or {}
-          if not data.get('ok'):
-              raise SystemExit('Reviewer project detail failed')
-          if len(project.get('change_requests') or []) < 2:
-              raise SystemExit('Reviewer project is missing companion change requests')
-          if not project.get('store_submissions'):
-              raise SystemExit('Reviewer project is missing read-only distribution status')
-          for forbidden in ('preview_url', 'live_url', 'repo_url', 'deployment'):
+          data=json.loads(sys.argv[1])
+          project=data.get('project') or {}
+          if not data.get('ok') or len(project.get('requests') or []) < 2:
+              raise SystemExit('Reviewer project coordination items are missing')
+          for forbidden in ('preview_url','live_url','repo_url','deployment','store_submissions','change_requests'):
               if forbidden in project:
-                  raise SystemExit(f'Forbidden builder field exposed in detail: {forbidden}')
-          print('public_companion_review_flow=verified')
-          print('project=' + project.get('name', ''))
-          print('change_requests=' + str(len(project.get('change_requests') or [])))
+                  raise SystemExit(f'Forbidden detail field exposed: {forbidden}')
+          print('reviewer_flow=verified')
           PY
 
+          signup_code="$(curl -4 -sS -o /tmp/signup.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' -d '{"email":"new@example.com","password":"x"}' \
+            https://studio.aplus-solution.de/api/mobile/signup/)"
+          create_code="$(curl -4 -sS -o /tmp/create.json -w '%{http_code}' \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"name":"New"}' \
+            https://studio.aplus-solution.de/api/mobile/projects/)"
           publish_code="$(curl -4 -sS -o /tmp/publish.json -w '%{http_code}' \
-            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-            -d '{}' "https://studio.aplus-solution.de/api/mobile/projects/$project_id/publish/")"
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' \
+            "https://studio.aplus-solution.de/api/mobile/projects/$project_id/publish/")"
           store_code="$(curl -4 -sS -o /tmp/store.json -w '%{http_code}' \
-            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-            -d '{"platform":"ios"}' "https://studio.aplus-solution.de/api/mobile/projects/$project_id/store-submission/")"
-          test "$publish_code" = "403"
-          test "$store_code" = "403"
-
-      - name: Save reviewer credentials artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          umask 077
-          {
-            printf 'Email: %s\n' "$REVIEW_EMAIL"
-            printf 'Password: %s\n' "$REVIEW_PASSWORD"
-            printf 'Workspace: A+ Studio App Review\n'
-            printf 'Pre-populated project: Luna Booking\n'
-            printf 'Instructions: Sign in with this dedicated App Review account. No purchase, subscription, credits or 2FA is required. The iOS app is a project companion: it shows project status, briefings, change requests and read-only distribution status. It does not generate or preview apps, execute code, publish builds or expose billing.\n'
-          } > review-credentials.txt
-
-      - name: Upload reviewer credentials
-        uses: actions/upload-artifact@v4
-        with:
-          name: a-studio-apple-review-credentials
-          path: review-credentials.txt
-          retention-days: 7
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' \
+            "https://studio.aplus-solution.de/api/mobile/projects/$project_id/store-submission/")"
+          test "$signup_code" = "403"
+          test "$create_code" = "403"
+          test "$publish_code" = "404"
+          test "$store_code" = "404"
+          echo 'mobile_boundaries=verified'
