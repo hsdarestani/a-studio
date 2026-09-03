@@ -90,7 +90,7 @@
         </form>
         <button class="btn secondary full" id="demo-mode">Demo ansehen</button>
         <p class="muted" style="margin-top:16px">Der mobile Zugang wird für bestehende Kundenkonten bereitgestellt.</p>
-        <div class="legal"><a href="${WEB}/privacy/" target="_blank" rel="noopener">Datenschutz</a><a href="${WEB}/terms/" target="_blank" rel="noopener">Bedingungen</a><a href="${WEB}/support/" target="_blank" rel="noopener">Support</a></div>
+        <div class="legal"><a href="${WEB}/mobile/privacy/" target="_blank" rel="noopener">Datenschutz</a><a href="${WEB}/mobile/terms/" target="_blank" rel="noopener">Bedingungen</a><a href="${WEB}/mobile/support/" target="_blank" rel="noopener">Support</a></div>
       </section></main>`;
 
     document.getElementById("demo-mode").addEventListener("click", showDemo);
@@ -188,7 +188,7 @@
       <div class="eyebrow">KONTO</div><h1>${escapeHtml(me.name)}</h1>
       <div class="card"><div class="detail-row"><span>E-Mail</span><b>${escapeHtml(me.email)}</b></div><div class="detail-row"><span>Kundenbereich</span><b>${escapeHtml(me.organization.name)}</b></div></div>
       <div class="card"><h2>Mobile Nutzung</h2><p>Dieser mobile Zugang dient der Koordination bereits bestehender Kundenprojekte und enthält keine Käufe oder Abonnements.</p></div>
-      <div class="card link-list"><a href="${WEB}/privacy/" target="_blank" rel="noopener">Datenschutz <span>›</span></a><a href="${WEB}/terms/" target="_blank" rel="noopener">Bedingungen <span>›</span></a><a href="${WEB}/support/" target="_blank" rel="noopener">Support <span>›</span></a></div>
+      <div class="card link-list"><a href="${WEB}/mobile/privacy/" target="_blank" rel="noopener">Datenschutz <span>›</span></a><a href="${WEB}/mobile/terms/" target="_blank" rel="noopener">Bedingungen <span>›</span></a><a href="${WEB}/mobile/support/" target="_blank" rel="noopener">Support <span>›</span></a></div>
       <button class="btn secondary full" id="logout">Abmelden</button><button class="textbtn danger full" id="delete-account">Konto dauerhaft löschen</button>
     `, "account");
     document.getElementById("logout").addEventListener("click", () => { setToken(""); state.me = null; showAuth(); });
