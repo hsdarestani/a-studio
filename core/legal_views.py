@@ -28,6 +28,22 @@ def support(request):
     return render(request, "legal/support.html", _legal_context())
 
 
+def mobile_landing(request):
+    return render(request, "legal/mobile_landing.html", _legal_context())
+
+
+def mobile_privacy(request):
+    return render(request, "legal/mobile_privacy.html", _legal_context())
+
+
+def mobile_terms(request):
+    return render(request, "legal/mobile_terms.html", _legal_context())
+
+
+def mobile_support(request):
+    return render(request, "legal/mobile_support.html", _legal_context())
+
+
 @require_http_methods(["GET", "POST"])
 def account_deletion(request):
     context = _legal_context()
