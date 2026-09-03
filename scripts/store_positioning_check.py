@@ -38,28 +38,40 @@ required = [
     "https://studio.aplus-solution.de/api/mobile",
     "/account/delete/",
     "/projects/",
-    "Projektbegleitung",
-    "Änderungswünsche",
-    "keinen Programmcode",
+    "KUNDENZUGANG",
+    "Kundenprojekte",
+    "Abstimmung",
+    "Demo ansehen",
+    "/mobile/privacy/",
+    "/mobile/support/",
 ]
 for marker in required:
     if marker not in app_js:
-        raise SystemExit(f"Native companion client is missing required flow: {marker}")
+        raise SystemExit(f"Native customer-project client is missing required flow: {marker}")
 
-# Regression guard for the App Review 2.5.2 rejection: the distributed mobile
-# client must not regain the old generated-app preview/publish controls.
+# Guideline 2.5.2 regression guard: the App Store binary must remain a customer
+# project coordination client, never an app builder, app previewer, software
+# distribution client, or executable-code environment.
 for forbidden in (
     "Preview öffnen",
     "Preview erstellen",
     "AI Builder",
+    "Code Agent",
+    "IDE-Vorschau",
     "Live veröffentlichen",
     "Kostenlos ausprobieren",
     "Start-Credits",
+    "Store Submission",
+    "Store-Einreichung",
+    "Veröffentlichungsstatus",
     "/store-submission/",
     "/publish/",
+    "/signup/",
+    "Konto erstellen",
+    'name="company_name"',
 ):
-    if forbidden in app_js:
-        raise SystemExit(f"App Store companion contains forbidden builder flow: {forbidden}")
+    if forbidden.lower() in app_js.lower():
+        raise SystemExit(f"App Store customer-project client contains forbidden flow: {forbidden}")
 
 store_profile = store_profile_path.read_text(encoding="utf-8")
 
@@ -93,22 +105,26 @@ for forbidden in ("app store", "ios", "iphone", "ipad"):
             f"Google Play description must not reference Apple platform metadata: {forbidden}"
         )
 
-for required_phrase in ("begleit-app", "projektkoordination"):
+for required_phrase in ("kundenbereich", "projektfortschritt", "projektteam"):
     if required_phrase not in apple_description:
         raise SystemExit(
-            f"Apple description must clearly position the product as a companion: {required_phrase}"
+            f"Apple description must clearly position the product as customer project coordination: {required_phrase}"
         )
 
 for forbidden_phrase in (
-    "apps mit ai bauen",
-    "ersten preview-build",
-    "direkt im ai builder",
-    "preview öffnen",
-    "store-publishing-prozess direkt",
+    "softwareprojekte",
+    "app-build",
+    "preview",
+    "programmcode",
+    "store-einreich",
+    "veröffentlichungsprozess",
+    "code agent",
+    "ide",
+    "ai builder",
 ):
     if forbidden_phrase in apple_description:
         raise SystemExit(
-            f"Apple description still contains rejected builder positioning: {forbidden_phrase}"
+            f"Apple description still contains software-builder positioning: {forbidden_phrase}"
         )
 
-print("A+ Studio store positioning check passed.")
+print("A+ Studio customer-project App Store positioning check passed.")
