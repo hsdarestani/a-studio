@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -12,7 +13,10 @@ from .models import FeatureRequest, Membership, Organization, Project
 )
 class MobileApiTests(TestCase):
     def test_public_legal_pages_are_available(self):
-        for path in ("/privacy/", "/terms/", "/support/", "/account-deletion/"):
+        for path in (
+            "/privacy/", "/terms/", "/support/", "/account-deletion/",
+            "/mobile/", "/mobile/privacy/", "/mobile/terms/", "/mobile/support/",
+        ):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200, path)
 
@@ -43,9 +47,9 @@ class MobileApiTests(TestCase):
         project = Project.objects.create(
             organization=organization,
             created_by=user,
-            name="Customer Project",
+            name="Existing App",
             business_type="Customer service",
-            description="Coordinate an existing customer engagement.",
+            description="An existing app project.",
             language="de",
             status=project_status,
         )
@@ -63,48 +67,56 @@ class MobileApiTests(TestCase):
         }
         return user, organization, project, headers
 
-    def test_mobile_registration_and_project_creation_are_disabled(self):
+    def test_mobile_registration_stays_disabled(self):
         signup = self.client.post(
             "/api/mobile/signup/",
-            data=json.dumps({
-                "email": "new@example.com",
-                "password": "Strong-Mobile-Pass-2026!",
-                "full_name": "New User",
-                "company_name": "New Company",
-            }),
+            data=json.dumps({"email": "new@example.com", "password": "Strong-Mobile-Pass-2026!"}),
             content_type="application/json",
         )
         self.assertEqual(signup.status_code, 403)
-        self.assertEqual(signup.json()["error"], "mobile_existing_projects_only")
+        self.assertEqual(signup.json()["error"], "mobile_existing_accounts_only")
 
-        _user, _organization, _project, headers = self._existing_account()
+    @patch("core.mobile_api.provision_initial_project.delay")
+    def test_mobile_can_create_cloud_app_without_exposing_executable_preview(self, enqueue):
+        _user, organization, _project, headers = self._existing_account()
         created = self.client.post(
             "/api/mobile/projects/",
             data=json.dumps({
-                "name": "New Project",
-                "business_type": "Test",
-                "description": "Should not be created from iOS.",
+                "name": "Luna Booking",
+                "business_type": "Salon",
+                "description": "Create a booking app with weekly appointments.",
                 "language": "de",
             }),
             content_type="application/json",
             **headers,
         )
-        self.assertEqual(created.status_code, 403)
-        self.assertEqual(created.json()["error"], "mobile_existing_projects_only")
-        self.assertEqual(Project.objects.count(), 1)
+        self.assertEqual(created.status_code, 201, created.content)
+        payload = created.json()["project"]
+        self.assertEqual(payload["status"], "queued")
+        self.assertEqual(payload["name"], "Luna Booking")
+        enqueue.assert_called_once()
 
-    def test_mobile_payload_is_existing_project_coordination_only(self):
+        project = Project.objects.get(pk=payload["id"])
+        self.assertEqual(project.builder_mode, "safe_pwa")
+        self.assertEqual(project.source_type, "prompt")
+        self.assertEqual(project.source_url, "")
+        self.assertEqual(project.organization, organization)
+
+        for forbidden in ("preview_url", "live_url", "repo_url", "deployment", "store_submissions"):
+            self.assertNotIn(forbidden, payload)
+
+    def test_mobile_payload_and_requests_keep_cloud_execution_boundary(self):
         _user, organization, project, headers = self._existing_account(project_status="preview")
 
         dashboard = self.client.get("/api/mobile/dashboard/", **headers)
         self.assertEqual(dashboard.status_code, 200)
         self.assertNotIn("credits", dashboard.json()["organization"])
         self.assertNotIn("plan", dashboard.json()["organization"])
-        self.assertEqual(dashboard.json()["projects"][0]["status"], "review")
+        self.assertEqual(dashboard.json()["projects"][0]["status"], "generated")
 
         request = self.client.post(
             f"/api/mobile/projects/{project.id}/chat/",
-            data=json.dumps({"message": "Please move our next coordination call to Thursday."}),
+            data=json.dumps({"message": "Add a clearer weekly booking flow."}),
             content_type="application/json",
             **headers,
         )
@@ -114,28 +126,25 @@ class MobileApiTests(TestCase):
         detail = self.client.get(f"/api/mobile/projects/{project.id}/", **headers)
         self.assertEqual(detail.status_code, 200)
         payload = detail.json()["project"]
-        self.assertEqual(payload["status"], "review")
+        self.assertEqual(payload["status"], "generated")
         self.assertEqual(len(payload["requests"]), 1)
-        for forbidden in (
-            "preview_url",
-            "live_url",
-            "repo_url",
-            "deployment",
-            "store_submissions",
-            "change_requests",
-        ):
+        for forbidden in ("preview_url", "live_url", "repo_url", "deployment", "store_submissions"):
             self.assertNotIn(forbidden, payload)
 
         config = self.client.get("/api/mobile/config/")
         self.assertEqual(config.status_code, 200)
+        self.assertEqual(config.json()["mode"], "cloud_app_builder")
         capabilities = config.json()["capabilities"]
         self.assertTrue(capabilities["existing_account_access"])
-        self.assertTrue(capabilities["existing_project_status"])
+        self.assertTrue(capabilities["project_creation"])
+        self.assertTrue(capabilities["cloud_app_generation"])
         self.assertFalse(capabilities["account_registration"])
-        self.assertFalse(capabilities["project_creation"])
-        self.assertFalse(capabilities["store_status"])
+        self.assertFalse(capabilities["code_download"])
+        self.assertFalse(capabilities["local_code_execution"])
         self.assertFalse(capabilities["external_app_preview"])
+        self.assertFalse(capabilities["store_status"])
         self.assertFalse(capabilities["mobile_publishing"])
+        self.assertFalse(capabilities["mobile_purchases"])
 
         organization.refresh_from_db()
         self.assertEqual(organization.credits, 0)
