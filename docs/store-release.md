@@ -14,7 +14,7 @@
 - Account deletion URL: `https://studio.aplus-solution.de/account-deletion/`
 - Category: Business / Productivity
 - Native technology: Capacitor 8 with a local first-party UI. There is no remote `server.url` WebView wrapper.
-- Mobile positioning: **cloud app creation and project management** for existing A+ Studio accounts.
+- Mobile positioning: **customer project coordination** for already assigned A+ Solution customer projects.
 
 ## German store copy
 
@@ -22,96 +22,86 @@
 A+ Studio
 
 **Apple subtitle**  
-Apps in der Cloud erstellen
+Kundenprojekte mobil
 
 **Google short description**  
-App-Projekte mobil starten und serverseitige Cloud-Erstellung verfolgen.
+Projektstatus und Abstimmung für bestehende A+ Solution Kundenprojekte.
 
 **Apple description**  
-A+ Studio ist ein Cloud App Builder für bestehende A+ Studio Nutzer.
+A+ Studio ist der mobile Kundenbereich für bestehende A+ Solution Projekte.
 
-Starten Sie neue App-Projekte mobil, beschreiben Sie Zielgruppe und gewünschte Funktionen und verfolgen Sie den Status der serverseitigen Erstellung. Änderungswünsche können direkt einem bestehenden App-Projekt zugeordnet werden.
+Sehen Sie Projektfortschritt, Projektbeschreibung und offene Abstimmungspunkte und senden Sie Fragen oder Feedback an das Projektteam.
 
-Die technische Generierung und Verarbeitung der App-Projekte findet auf der A+ Studio Cloud-Infrastruktur statt. Die mobile Anwendung lädt, installiert oder führt den generierten App-Code nicht aus und startet erzeugte Anwendungen nicht als ausführbare Preview innerhalb der App.
+Der mobile Zugang ist ausschließlich für bereits zugeordnete Kundenprojekte gedacht. Konten und Projekte werden außerhalb der mobilen App durch das A+ Solution Projektteam eingerichtet. Für die unverbindliche Ansicht des mobilen Funktionsumfangs steht direkt auf der Anmeldeseite ein Demo-Modus bereit.
 
-Konten werden außerhalb der mobilen Anwendung eingerichtet. Ein lokaler Demo-Modus auf der Anmeldeseite erklärt den vollständigen mobilen Workflow ohne Anmeldung. Die mobile App enthält keine Käufe oder Abonnements.
+Die App enthält keine Käufe oder Abonnements.
 
 **Google Play description**  
-A+ Studio ist ein Cloud App Builder für bestehende A+ Studio Nutzer.
+A+ Studio ist der mobile Kundenbereich für bestehende A+ Solution Projekte.
 
-Starten Sie neue App-Projekte mobil, beschreiben Sie Zielgruppe und gewünschte Funktionen und verfolgen Sie den Status der serverseitigen Erstellung. Änderungswünsche können direkt einem bestehenden App-Projekt zugeordnet werden.
+Sehen Sie Projektfortschritt, Projektbeschreibung und offene Abstimmungspunkte und senden Sie Fragen oder Feedback an das Projektteam.
 
-Die technische Generierung und Verarbeitung der App-Projekte findet serverseitig in der A+ Studio Cloud statt. Die mobile Anwendung lädt oder installiert keine erzeugten App-Builds.
+Der mobile Zugang ist ausschließlich für bereits zugeordnete Kundenprojekte gedacht. Konten und Projekte werden außerhalb der mobilen App durch das A+ Solution Projektteam eingerichtet. Ein Demo-Modus ist direkt auf der Anmeldeseite verfügbar.
 
-Konten werden außerhalb der mobilen Anwendung eingerichtet. Ein lokaler Demo-Modus erklärt den mobilen Workflow ohne Anmeldung. Die mobile App enthält keine Käufe oder Abonnements.
+Die mobile App enthält keine Käufe oder Abonnements.
 
 **Keywords (Apple)**  
-app-projekte,cloud,builder,software,projekt,status,produkt,workflow,business
+projekt,kundenbereich,status,abstimmung,feedback,team,business,produktivität
 
 **Promotional text**  
-Neue App-Projekte mobil starten und ihre serverseitige Erstellung in A+ Studio Cloud verfolgen.
+Bestehende Kundenprojekte mobil im Blick behalten und mit dem Projektteam abstimmen.
 
 ## App Review notes
 
-### Guideline 2.5.2 remediation for Build 8
+### Guideline 2.5.2 remediation for Build 7
 
-Build 8 presents the product accurately as a cloud-based app creation service while keeping the iOS execution boundary explicit and enforced.
+Build 7 has been deliberately reduced to an existing-customer project coordination client.
 
-- A+ Studio is used to create app projects.
-- Existing authenticated users can create a new app project in iOS by entering an app name, business type, language and functional requirements.
-- Creating a project sends those inputs to A+ Studio's remote infrastructure and starts server-side generation there.
-- The generated application's code and build artifacts remain on the remote service.
-- The iOS client does **not** download, install or execute generated application code.
-- The iOS client does **not** launch a generated customer application inside A+ Studio as an executable app preview/runtime.
-- The mobile API deliberately omits generated-app `preview_url`, `live_url`, repository URLs, deployment artifacts and downloadable build files.
-- The iOS app contains no controls for installing generated apps, downloading IPA/APK files, publishing a generated app, or submitting a generated app to an app store.
-- Project change requests can be recorded from iOS for the remote project workflow/team; they do not execute downloaded code in the iOS process.
-- Account registration is not offered in iOS. Existing A+ Studio accounts sign in.
-- App Review can tap **Demo ansehen** on the sign-in screen to inspect the complete iOS product concept without credentials.
-- The demo is bundled/local; it does not execute generated code and does not depend on a reviewer account.
-
-This design keeps the iOS app self-contained while using ordinary HTTPS requests to control a remote cloud service. Generated software is never introduced into the A+ Studio iOS runtime.
-
-### App-generation / distribution clarification
-
-A+ Studio is itself a tool for creating customized app projects. Build 8 does not act as a software store or distribution channel. It does not install generated apps and it does not submit generated apps to a store from the iOS client. Any generated app intended for public distribution remains a separate product and must independently satisfy the applicable store rules and content-provider/developer-account requirements.
+- App Review can tap **Demo ansehen** on the sign-in screen and evaluate the complete iOS feature set locally without an account.
+- There is no account registration in the iOS app.
+- There is no project creation in the iOS app.
+- The mobile client displays only projects already assigned to an existing customer account.
+- Project detail contains the project name, description, neutral progress state and customer coordination items.
+- Sending a question or feedback item records a customer request for the human A+ Solution project team.
+- The mobile API enforces the same boundaries server-side.
+- The iOS client does not contain software creation, executable-content, external-app runtime, distribution or store-control functionality.
+- Mobile-specific marketing, privacy, terms and support pages describe only this customer-project feature set.
 
 ### Review access
 
-- App Review does **not** need credentials to understand the complete iOS workflow.
+- App Review does **not** need credentials.
 - Tap **Demo ansehen** on the sign-in screen.
-- The local demo shows: project creation input → remote/cloud generation → project status and change-request workflow.
-- Existing users can sign in with accounts provisioned outside the iOS app.
+- The demo is local and does not depend on backend account data.
+- Existing A+ Solution customers may sign in with accounts provisioned by the project team outside the mobile app.
 - Account deletion is available in-app under **Konto → Konto dauerhaft löschen** and externally at the account deletion URL.
 
 ### Business model
 
-- The iOS app contains no purchases, subscriptions, pricing, paid feature unlocks or external purchase calls to action.
-- Account provisioning and any separate B2B commercial relationship are outside the iOS app.
-- No paid digital content is sold or unlocked inside Build 8.
+- The iOS app contains no purchases, subscriptions, credits, pricing, feature unlocks or external purchase calls to action.
+- Existing customers may have a separate B2B services relationship with A+ Solution GmbH, but the mobile app is only a project coordination surface.
+- No paid digital content is unlocked in the iOS app.
 
 ## Privacy / data disclosures
 
 The store declarations must match the production behavior at submission time.
 
 ### Collected
-- Contact info: email address and account name for authenticated access.
-- User content: app-project names, business context, functional requirements and change requests.
+- Contact info: email address and account name for authenticated customer access.
+- User content: customer project descriptions and questions/feedback submitted to the project team.
 - Identifiers: internal account/project identifiers.
 - Diagnostics/security: server logs necessary for security, reliability and abuse prevention.
 
 ### Purposes
-- Existing-account authentication.
-- Creating and managing app projects on remote A+ Studio infrastructure.
-- Displaying remote project-generation lifecycle state.
-- Recording project change requests.
+- Existing customer authentication.
+- Displaying already assigned project information and progress.
+- Customer/project-team coordination.
 - Account management, support, security and service reliability.
 
 ### Mobile backend behavior
 - Mobile account registration is disabled.
-- Mobile app-project creation is enabled.
-- App generation is started remotely on A+ Studio infrastructure.
-- The mobile API does not expose executable generated-app previews, generated source repositories, deployment URLs, downloadable build artifacts or store-submission controls.
+- Mobile project creation is disabled.
+- The mobile API exposes only neutral customer project progress and coordination data.
+- Customer messages are stored as requests for human project-team review.
 - The mobile client has no advertising SDK, payment SDK or cross-app tracking.
 
 ### Tracking
@@ -132,4 +122,4 @@ The store declarations must match the production behavior at submission time.
 - Publisher-managed Apple Distribution certificate and App Store provisioning profile.
 - `ITSAppUsesNonExemptEncryption = NO`.
 - A privacy manifest is created during the native build for the app target.
-- Build 8 supersedes Build 7 so App Store metadata and the binary accurately describe A+ Studio as a cloud app-creation service while preserving the Guideline 2.5.2 local execution boundary.
+- Build 7 is the remediation binary for the rejected `1.0.0 (6)` submission.
