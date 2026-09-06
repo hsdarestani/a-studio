@@ -1,0 +1,59 @@
+name: Inspect existing Apple reviewer account
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-existing-apple-reviewer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install SSH client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Inspect reviewer account state
+        env:
+          SSHPASS: ${{ secrets.PASS }}
+          HOST: ${{ secrets.HOST }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sshpass -e ssh -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@"$HOST" \
+            "cd /opt/a-studio/current && docker compose exec -T web python manage.py shell" <<'PY'
+          import json
+          from django.contrib.auth import get_user_model
+          from core.models import Membership
+
+          email = 'app-review-b4-31884067732@studio.aplus-solution.de'
+          User = get_user_model()
+          user = User.objects.filter(email__iexact=email).first()
+          if not user:
+              print('REVIEWER|' + json.dumps({'exists': False, 'email': email}, sort_keys=True, default=str))
+              raise SystemExit(1)
+          memberships = Membership.objects.select_related('organization').filter(user=user, organization__active=True)
+          projects = []
+          for membership in memberships:
+              for project in membership.organization.projects.all():
+                  projects.append({
+                      'id': str(project.id),
+                      'name': project.name,
+                      'status': project.status,
+                  })
+          print('REVIEWER|' + json.dumps({
+              'exists': True,
+              'email': email,
+              'active': user.is_active,
+              'last_login': user.last_login,
+              'memberships': memberships.count(),
+              'projects': projects,
+          }, sort_keys=True, default=str))
+          if not user.is_active or not projects:
+              raise SystemExit(1)
+          PY
