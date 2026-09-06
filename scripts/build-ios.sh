@@ -26,11 +26,9 @@ if [ ! -d ios ]; then
   npx cap add ios
 fi
 
-# The shared local UI also powers the Android companion. Prepare an iOS-only
-# copy before `cap sync` so the App Store bundle does not mention competing
-# distribution platforms and cannot create business/organization accounts.
-# Existing A+ Studio customers can sign in with credentials provisioned outside
-# the iOS app; web and Android registration remain unchanged.
+# Prepare an iOS-only copy before `cap sync`. The committed mobile UI is
+# already companion-only; the sanitizer below remains as defense in depth for
+# platform wording and account-registration regressions.
 IOS_APP_JS="$ROOT/www/app.js"
 IOS_APP_JS_BACKUP="$ROOT/www/.app.js.publisher-ios-backup"
 restore_ios_web() {
@@ -56,8 +54,7 @@ text = text.replace(
 )
 
 # App Review Guideline 3.1.1: the iOS companion is existing-account login only.
-# Remove every reachable account-creation affordance from the native bundle
-# while leaving the shared Android/web source intact after cap sync.
+# Remove every reachable account-creation affordance from the native bundle.
 text = text.replace(
     'function showAuth(mode = "login", message = "") {\n    const signup = mode === "signup";',
     'function showAuth(mode = "login", message = "") {\n    const signup = false;',
@@ -86,10 +83,6 @@ text = text.replace(
     'Anmelden',
 )
 text = text.replace(
-    '${signup ? "" : \'<button class="btn secondary full" id="demo-mode">Demo ansehen</button>\'}',
-    '<button class="btn secondary full" id="demo-mode">Demo ansehen</button>',
-)
-text = text.replace(
     '          <button class="textbtn" id="auth-switch">${signup ? "Schon registriert? Anmelden" : "Noch kein Begleitkonto? Konto erstellen"}</button>\n',
     '',
 )
@@ -116,8 +109,8 @@ for candidate in (Path("www/index.html"), Path("www/app.js"), Path("www/app.css"
                 f"iOS native web bundle still contains forbidden third-party platform reference {forbidden!r} in {candidate}"
             )
 
-# Fail the build if a future UI change accidentally restores business account
-# registration to the iOS native bundle.
+# Fail the build if a future UI change accidentally restores account creation,
+# app-building, or app-preview behavior to the App Store bundle.
 ios_js = Path("www/app.js").read_text(encoding="utf-8")
 for forbidden in (
     'name="company_name"',
@@ -125,11 +118,17 @@ for forbidden in (
     'Konto erstellen',
     'BEGLEITKONTO ERSTELLEN',
     'id="auth-switch"',
+    'Cloud App Builder',
+    'CLOUD APP BUILDER',
+    'Neue App',
+    'App-Erstellung starten',
+    'Demo ansehen',
+    'REVIEW DEMO',
 ):
-    if forbidden in ios_js:
-        raise SystemExit(f"iOS native bundle still exposes account registration marker: {forbidden!r}")
+    if forbidden.lower() in ios_js.lower():
+        raise SystemExit(f"iOS native bundle contains forbidden App Store marker: {forbidden!r}")
 
-print("iOS native web bundle sanitized for App Store review (login-only, no account registration).")
+print("iOS native web bundle verified: existing-account, existing-project companion only.")
 PY
 
 npx cap sync ios
@@ -151,10 +150,16 @@ for forbidden in (
     'Konto erstellen',
     'BEGLEITKONTO ERSTELLEN',
     'id="auth-switch"',
+    'Cloud App Builder',
+    'CLOUD APP BUILDER',
+    'Neue App',
+    'App-Erstellung starten',
+    'Demo ansehen',
+    'REVIEW DEMO',
 ):
-    if forbidden in payload:
-        raise SystemExit(f"Generated iOS bundle contains account registration marker: {forbidden!r}")
-print("Generated iOS Capacitor bundle verified: existing-account login only.")
+    if forbidden.lower() in payload.lower():
+        raise SystemExit(f"Generated iOS bundle contains forbidden App Store marker: {forbidden!r}")
+print("Generated iOS Capacitor bundle verified: existing-project companion only.")
 PY
 
 restore_ios_web
@@ -215,9 +220,9 @@ mkdir -p artifacts build/ios
 ARCHIVE="$ROOT/build/ios/AStudio.xcarchive"
 EXPORT_DIR="$ROOT/build/ios/export"
 VERSION="${APP_VERSION_NAME:-${APP_VERSION:-1.0.0}}"
-# Build 4 was rejected on 2026-08-16 for business account registration.
-# Default the next Publisher build to 5; automation may override explicitly.
-BUILD="${APP_BUILD_NUMBER:-${BUILD_NUMBER:-5}}"
+# Build 10 was rejected on 2026-09-06 under App Review Guideline 2.5.2.
+# Default the remediation submission to Build 11; automation may override it.
+BUILD="${APP_BUILD_NUMBER:-${BUILD_NUMBER:-11}}"
 TEAM_ID="${APPLE_TEAM_ID:-${IOS_TEAM_ID:-}}"
 AUTH_KEY_PATH="${APPLE_AUTH_KEY_PATH:-${APPLE_API_KEY_PATH:-}}"
 SIGNING_STYLE="${IOS_SIGNING_STYLE:-Automatic}"
