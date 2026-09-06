@@ -37,24 +37,30 @@ app_js = app_path.read_text(encoding="utf-8")
 required = [
     "https://studio.aplus-solution.de/api/mobile",
     "/account/delete/",
-    "/projects/",
-    "CLOUD APP BUILDER",
-    "Neue App",
-    "App-Erstellung starten",
-    "serverseitig",
-    "Demo ansehen",
+    "/dashboard/",
+    "KUNDENZUGANG",
+    "KUNDENBEREICH",
+    "bereits bestehende",
+    "Anfrage senden",
     "/mobile/privacy/",
     "/mobile/support/",
 ]
 for marker in required:
     if marker not in app_js:
-        raise SystemExit(f"Cloud app builder is missing required flow: {marker}")
+        raise SystemExit(f"Existing-project companion is missing required flow: {marker}")
 
-# Guideline 2.5.2 regression guard: app creation may be initiated from iOS,
-# but generated application code must stay on A+ cloud infrastructure. The
-# iOS binary must never offer controls that execute, install, download or
-# launch a generated app. Negative disclosure text is intentionally allowed.
+# Guideline 2.5.2 regression guard: the App Store client is only a companion
+# for projects that already exist and were assigned outside the mobile app.
+# It must never create, generate, preview, execute, install or distribute apps.
 for forbidden in (
+    "Cloud App Builder",
+    "CLOUD APP BUILDER",
+    "Neue App",
+    "Neue App starten",
+    "App-Erstellung starten",
+    "Cloud-Generierung",
+    "Demo ansehen",
+    "REVIEW DEMO",
     "Preview öffnen",
     "Preview erstellen",
     "Live veröffentlichen",
@@ -69,7 +75,7 @@ for forbidden in (
     'name="company_name"',
 ):
     if forbidden.lower() in app_js.lower():
-        raise SystemExit(f"iOS cloud builder contains forbidden executable/distribution control: {forbidden}")
+        raise SystemExit(f"App Store companion contains forbidden builder/preview marker: {forbidden}")
 
 store_profile = store_profile_path.read_text(encoding="utf-8")
 
@@ -103,24 +109,26 @@ for forbidden in ("app store", "ios", "iphone", "ipad"):
             f"Google Play description must not reference Apple platform metadata: {forbidden}"
         )
 
-for required_phrase in ("app-projekte", "cloud", "serverseitig"):
+for required_phrase in ("bestehende", "kundenprojekte", "projektteam"):
     if required_phrase not in apple_description:
         raise SystemExit(
-            f"Apple description must clearly disclose cloud app creation: {required_phrase}"
+            f"Apple description must clearly describe existing-project companion scope: {required_phrase}"
         )
 
-# Store copy must never advertise install/download/distribution controls. It
-# may explicitly state that those capabilities are not present.
 for forbidden_phrase in (
-    "jetzt app installieren",
-    "build jetzt herunterladen",
+    "cloud app builder",
+    "neue app",
+    "app-erstellung",
+    "generierten app-code",
+    "demo-modus",
+    "preview",
+    "build herunterladen",
     "ipa herunterladen",
-    "apk herunterladen",
-    "store-einreichung direkt aus der app",
+    "store-einreichung",
 ):
     if forbidden_phrase in apple_description:
         raise SystemExit(
-            f"Apple description advertises forbidden executable/distribution flow: {forbidden_phrase}"
+            f"Apple description advertises or discusses forbidden builder/preview behavior: {forbidden_phrase}"
         )
 
-print("A+ Studio truthful cloud-app-builder App Store positioning check passed.")
+print("A+ Studio existing-project App Store companion positioning check passed.")
